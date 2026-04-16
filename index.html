@@ -6,6 +6,7 @@
 
 <script src="https://cdn.jsdelivr.net/npm/papaparse@5.3.2/papaparse.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels"></script>
 
 <style>
 body { font-family: Arial; margin: 20px; }
@@ -43,7 +44,9 @@ th { background: #eee; }
 <div class="botones" id="botonesMes"></div>
 <div id="tablaResumen"></div>
 
-<canvas id="graficoZonas" height="120"></canvas>
+<div style="width: 80%; margin: 40px auto;">
+  <canvas id="graficoZonas"></canvas>
+</div>
 
 <script>
 
@@ -276,20 +279,35 @@ function renderGrafico(data) {
       datasets: [
         {
           label: '% Ejecutado',
-          data: porcentajes
+          data: porcentajes,
+          backgroundColor: [
+            '#FFD700',
+            '#007BFF',
+            '#FF69B4',
+            '#28A745',
+            '#FF8C00'
+          ]
         },
         {
           type: 'line',
           label: '100%',
           data: zonas.map(() => 100),
           borderDash: [5,5],
+          borderColor: '#000',
           fill: false
         }
       ]
     },
     options: {
       indexAxis: 'y',
-      responsive: true,
+      plugins: {
+        datalabels: {
+          color: '#000',
+          anchor: 'center',
+          align: 'center',
+          formatter: (value) => value.toFixed(1) + '%'
+        }
+      },
       scales: {
         x: {
           beginAtZero: true,
@@ -299,7 +317,8 @@ function renderGrafico(data) {
           }
         }
       }
-    }
+    },
+    plugins: [ChartDataLabels]
   });
 }
 
