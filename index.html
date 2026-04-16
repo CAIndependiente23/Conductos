@@ -6,7 +6,6 @@
 
 <script src="https://cdn.jsdelivr.net/npm/papaparse@5.3.2/papaparse.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels"></script>
 
 <style>
 body { font-family: Arial; margin: 20px; }
@@ -40,6 +39,8 @@ th { background: #eee; }
 <body>
 
 <h2>Limpieza de Conductos</h2>
+
+<div id="loading">Cargando datos...</div>
 
 <div class="botones" id="botonesMes"></div>
 <div id="tablaResumen"></div>
@@ -156,6 +157,8 @@ async function cargarDatos() {
 
   let resultados = await Promise.all(promesas);
   datosGlobal = resultados.flat().filter(d => d.mesKey);
+
+  document.getElementById("loading").style.display = "none";
 
   crearBotones();
 }
@@ -300,12 +303,29 @@ function renderGrafico(data) {
     },
     options: {
       indexAxis: 'y',
-      plugins: {
-        datalabels: {
-          color: '#000',
-          anchor: 'center',
-          align: 'center',
-          formatter: (value) => value.toFixed(1) + '%'
+      responsive: true,
+      animation: {
+        onComplete: function () {
+          const chartInstance = this.chart;
+          const ctx = chartInstance.ctx;
+
+          ctx.font = '12px Arial';
+          ctx.textAlign = 'center';
+          ctx.fillStyle = '#000';
+
+          this.data.datasets[0].data.forEach((value, index) => {
+
+            // ❌ ocultar 0% y 100%
+            if (value === 0 || value >= 100) return;
+
+            const meta = chartInstance.getDatasetMeta(0);
+            const bar = meta.data[index];
+
+            let x = bar.x - 25;
+            let y = bar.y + 4;
+
+            ctx.fillText(value.toFixed(1) + '%', x, y);
+          });
         }
       },
       scales: {
@@ -317,8 +337,7 @@ function renderGrafico(data) {
           }
         }
       }
-    },
-    plugins: [ChartDataLabels]
+    }
   });
 }
 
