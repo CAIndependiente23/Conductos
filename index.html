@@ -32,7 +32,7 @@ th, td {
 
 th { background: #eee; }
 
-.faltante { background-color: #ffcccc; }
+.faltante { background-color: #ffdddd; }
 
 #map { height: 420px; margin-top: 20px; }
 </style>
@@ -54,7 +54,7 @@ th { background: #eee; }
   <canvas id="graficoZonas"></canvas>
 </div>
 
-<h3>Mapa GIS</h3>
+<h3>Mapa</h3>
 <div id="map"></div>
 
 <h3>Detalle de Registros</h3>
@@ -77,7 +77,7 @@ th { background: #eee; }
 
 <script>
 
-// ---------------- DATA ----------------
+// ================= DATA =================
 const URLS_ZONAS = {
   "Zona 1": "https://docs.google.com/spreadsheets/d/1HIJJCVYnwaDdAvgxfI4tBA-5wn_0B1Bog19cUgJYyuo/export?format=csv&gid=2037627206",
   "Zona 2": "https://docs.google.com/spreadsheets/d/1_uR77zitjM6EpbPlmhg92VaNteJuYb28hQkDKbWX2V4/export?format=csv&gid=1607259408",
@@ -85,9 +85,6 @@ const URLS_ZONAS = {
   "Zona 4": "https://docs.google.com/spreadsheets/d/1AZAvTvfohVXr8qKlZuejzD1FXHO5T2itzG8rZpbkVUc/export?format=csv&gid=184101373",
   "Zona 5": "https://docs.google.com/spreadsheets/d/1gaPIk0bPccxj1Wi853iEzvPN3OhE92L1cHgMYJYgztI/export?format=csv&gid=1465503285"
 };
-
-const URL_COORDS =
-"https://docs.google.com/spreadsheets/d/1OsRXS125K9GfH24Qa6nriI4-MUeQB_OWWhJBdi1arw0/export?format=csv&gid=0";
 
 const pliego = {
   "Zona 1": 2590,
@@ -98,7 +95,6 @@ const pliego = {
 };
 
 let datosGlobal = [];
-let coordsMap = {};
 let mesSeleccionado = null;
 let modoBuscador = false;
 
@@ -106,7 +102,7 @@ let chart = null;
 let map;
 let markers = [];
 
-// ---------------- MAP ----------------
+// ================= MAP =================
 function initMap(){
   map = L.map('map').setView([-34.6,-58.38], 11);
 
@@ -115,7 +111,7 @@ function initMap(){
   }).addTo(map);
 }
 
-// ---------------- UTILS ----------------
+// ================= UTILS =================
 function limpiar(t){
   return (t||"").toString().trim().toUpperCase()
   .normalize("NFD").replace(/[\u0300-\u036f]/g,"");
@@ -130,7 +126,7 @@ function num(v){
   return parseFloat((v||"").toString().replace(".","").replace(",",".")||0);
 }
 
-// ---------------- MES ----------------
+// ================= MES =================
 function parseMes(t){
   const m=["ENERO","FEBRERO","MARZO","ABRIL","MAYO","JUNIO","JULIO","AGOSTO","SEPTIEMBRE","OCTUBRE","NOVIEMBRE","DICIEMBRE"];
   const c=["ENE","FEB","MAR","ABR","MAY","JUN","JUL","AGO","SEP","OCT","NOV","DIC"];
@@ -147,28 +143,7 @@ function parseMes(t){
   return {key:new Date(y,i,1).getTime(),label};
 }
 
-// ---------------- LOAD ----------------
-async function loadCoords(){
-  return new Promise(res=>{
-    Papa.parse(URL_COORDS,{
-      download:true,
-      header:true,
-      complete:r=>{
-        r.data.forEach(d=>{
-          let id=get(d,"Marca temporal");
-          let c=get(d,"C1");
-
-          if(id && c){
-            let [lat,lon]=c.split(",");
-            coordsMap[id]={lat:+lat,lon:+lon};
-          }
-        });
-        res();
-      }
-    });
-  });
-}
-
+// ================= LOAD =================
 async function loadData(){
 
   let prom=Object.entries(URLS_ZONAS).map(([z,url])=>new Promise(res=>{
@@ -177,7 +152,6 @@ async function loadData(){
       header:true,
       complete:r=>{
         res(r.data.map(d=>({
-          id:get(d,"Marca temporal"),
           Zona:z,
           mes:parseMes(get(d,"Certificado MES")),
           estado:get(d,"Aprobación"),
@@ -201,7 +175,7 @@ async function loadData(){
   crearBotones();
 }
 
-// ---------------- BOTONES ----------------
+// ================= BOTONES =================
 function crearBotones(){
 
   let cont=document.getElementById("botonesMes");
@@ -217,6 +191,10 @@ function crearBotones(){
     b.onclick=()=>{
       modoBuscador=false;
       mesSeleccionado=m.key;
+
+      document.getElementById("buscadorCalle").value="";
+      document.getElementById("filtroZona").value="TODAS";
+
       calcular();
     };
 
@@ -224,7 +202,7 @@ function crearBotones(){
   });
 }
 
-// ---------------- BUSCADOR ----------------
+// ================= BUSCADOR =================
 function activarBuscador(){
   modoBuscador=true;
   mesSeleccionado=null;
@@ -236,7 +214,7 @@ function activarBuscador(){
   renderMap(datosGlobal);
 }
 
-// ---------------- CALCULAR ----------------
+// ================= CALCULAR =================
 function calcular(){
 
   let data = modoBuscador
@@ -266,7 +244,7 @@ function calcular(){
   renderDetalle(data);
 }
 
-// ---------------- TABLA ----------------
+// ================= TABLA =================
 function renderTabla(data){
 
   let html=`<table><tr>
@@ -292,7 +270,7 @@ function renderTabla(data){
   document.getElementById("tablaResumen").innerHTML=html;
 }
 
-// ---------------- GRAFICO ----------------
+// ================= GRAFICO =================
 function renderGrafico(data){
 
   let ctx=document.getElementById("graficoZonas").getContext("2d");
@@ -327,37 +305,29 @@ function renderGrafico(data){
   });
 }
 
-// ---------------- MAP ----------------
+// ================= MAP =================
 function renderMap(data){
 
   markers.forEach(m=>map.removeLayer(m));
   markers=[];
 
   data.forEach(d=>{
-    let c=coordsMap[d.id];
-    if(!c) return;
+    if(!d.lat) return;
 
     let color =
       d.estado.includes("APROBADO")?"green":
       d.estado.includes("RECH")?"red":"orange";
 
-    let m=L.circleMarker([c.lat,c.lon],{
+    let m=L.circleMarker([d.lat,d.lon],{
       radius:5,color
     }).addTo(map);
 
-    let fotos = `
-      ${d.f1?`<a href="${d.f1}" target="_blank">Inicio</a><br>`:""}
-      ${d.f2?`<a href="${d.f2}" target="_blank">Fin</a><br>`:""}
-      ${d.f3?`<a href="${d.f3}" target="_blank">BR</a>`:""}
-    `;
-
-    m.bindPopup(`<b>${d.Zona}</b><br>${d.calle||""}<br>${fotos}`);
-
+    m.bindPopup(`<b>${d.Zona}</b><br>${d.calle||""}`);
     markers.push(m);
   });
 }
 
-// ---------------- DETALLE (FIX FINAL) ----------------
+// ================= DETALLE =================
 function renderDetalle(data){
 
   let zona=document.getElementById("filtroZona")?.value || "TODAS";
@@ -369,16 +339,10 @@ function renderDetalle(data){
   });
 
   let html=`<table><tr>
-  <th>Calle</th>
-  <th>Inicio</th>
-  <th>Fin</th>
-  <th>Diámetro</th>
-  <th>Longitud</th>
-  <th>Inicio Foto</th>
-  <th>Fin Foto</th>
-  <th>BR Foto</th>
-  <th>Aprobación</th>
-  </tr>`;
+  <th>Calle</th><th>Inicio</th><th>Fin</th>
+  <th>Diámetro</th><th>Long</th>
+  <th>Inicio Foto</th><th>Fin Foto</th><th>BR Foto</th>
+  <th>Aprobación</th></tr>`;
 
   filtrado.forEach(d=>{
     html+=`<tr>
@@ -387,9 +351,9 @@ function renderDetalle(data){
     <td>${d.fin||""}</td>
     <td>${d.diam||""}</td>
     <td>${d.long||0}</td>
-    <td>${d.f1?`<a href="${d.f1}" target="_blank">ver</a>`:""}</td>
-    <td>${d.f2?`<a href="${d.f2}" target="_blank">ver</a>`:""}</td>
-    <td>${d.f3?`<a href="${d.f3}" target="_blank">ver</a>`:""}</td>
+    <td>${d.f1?`<a target="_blank" href="${d.f1}">ver</a>`:""}</td>
+    <td>${d.f2?`<a target="_blank" href="${d.f2}">ver</a>`:""}</td>
+    <td>${d.f3?`<a target="_blank" href="${d.f3}">ver</a>`:""}</td>
     <td>${d.estado||""}</td>
     </tr>`;
   });
@@ -398,10 +362,9 @@ function renderDetalle(data){
   document.getElementById("tablaDetalle").innerHTML=html;
 }
 
-// ---------------- START ----------------
+// ================= START =================
 async function start(){
   initMap();
-  await loadCoords();
   await loadData();
 }
 
