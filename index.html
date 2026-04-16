@@ -9,9 +9,7 @@
 <style>
 body { font-family: Arial; margin: 20px; }
 
-h2 {
-  margin-bottom: 10px;
-}
+h2 { margin-bottom: 10px; }
 
 .botones button {
   margin: 5px;
@@ -37,9 +35,7 @@ th, td {
   text-align: center;
 }
 
-th {
-  background: #eee;
-}
+th { background: #eee; }
 </style>
 </head>
 
@@ -53,7 +49,7 @@ th {
 
 <script>
 
-// 🔗 GOOGLE SHEETS CSV
+// 🔗 GOOGLE SHEETS
 const URL_CSV = "https://docs.google.com/spreadsheets/d/1OsRXS125K9GfH24Qa6nriI4-MUeQB_OWWhJBdi1arw0/export?format=csv&gid=0";
 
 // 📊 PLIEGO
@@ -66,9 +62,20 @@ const pliego = {
 };
 
 let datosGlobal = [];
-let mesSeleccionado = null;
+let certificadoSeleccionado = null;
 
-// 📅 Parse fecha formato argentino
+// 🔧 Normalizar texto (clave para evitar errores)
+function limpiarTexto(txt) {
+  if (!txt) return "";
+  return txt
+    .toString()
+    .trim()
+    .toUpperCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "");
+}
+
+// 📅 Parse fecha (dd/mm/yyyy)
 function parseFecha(fechaStr) {
   if (!fechaStr) return null;
 
@@ -78,36 +85,30 @@ function parseFecha(fechaStr) {
   return new Date(partes[2], partes[1] - 1, partes[0]);
 }
 
-function obtenerMes(fechaStr) {
-  let fecha = parseFecha(fechaStr);
-  if (!fecha) return null;
-  return fecha.getMonth();
-}
-
 // 📥 Cargar datos
 Papa.parse(URL_CSV, {
   download: true,
   header: true,
   complete: function(results) {
     datosGlobal = results.data;
-    crearBotonesMes();
+    crearBotones();
   }
 });
 
-// 🔘 Crear botones de meses
-function crearBotonesMes() {
+// 🔘 BOTONES (Certificado)
+function crearBotones() {
   const cont = document.getElementById("botonesMes");
 
-  let meses = [...new Set(datosGlobal.map(d => obtenerMes(d["Marca temporal"])))].filter(m => m !== null);
+  let certificados = [...new Set(
+    datosGlobal.map(d => d["Certificado"]).filter(c => c && c !== "")
+  )];
 
-  meses.sort((a,b)=>a-b);
-
-  meses.forEach(m => {
+  certificados.forEach(c => {
     let btn = document.createElement("button");
-    btn.innerText = "Mes " + (m+1);
+    btn.innerText = c;
 
     btn.onclick = () => {
-      mesSeleccionado = m;
+      certificadoSeleccionado = c;
       calcular();
     };
 
@@ -115,10 +116,10 @@ function crearBotonesMes() {
   });
 }
 
-// 🧠 Calcular métricas
+// 🧠 CALCULAR
 function calcular() {
 
-  let filtrados = datosGlobal.filter(d => obtenerMes(d["Marca temporal"]) === mesSeleccionado);
+  let filtrados = datosGlobal.filter(d => d["Certificado"] === certificadoSeleccionado);
 
   let resultado = {};
 
@@ -134,11 +135,11 @@ function calcular() {
   filtrados.forEach(d => {
 
     let zona = d["Zona"];
-    let estado = (d["Aprobación"] || "").toUpperCase();
+    let estado = limpiarTexto(d["Aprobación"]);
     let longitud = parseFloat(d["Longitud"]) || 0;
     let fecha = parseFecha(d["Marca temporal"]);
 
-    if (!resultado[zona]) return;
+    if (!zona || !resultado[zona]) return;
 
     if (estado === "APROBADO") {
       resultado[zona].longitud += longitud;
@@ -160,7 +161,7 @@ function calcular() {
   renderTabla(resultado);
 }
 
-// 📊 Render tabla
+// 📊 TABLA
 function renderTabla(data) {
 
   let html = `
@@ -177,7 +178,10 @@ function renderTabla(data) {
 
   Object.keys(data).forEach(zona => {
     let d = data[zona];
-    let porcentaje = ((d.longitud / pliego[zona]) * 100 || 0).toFixed(1);
+
+    let porcentaje = pliego[zona]
+      ? ((d.longitud / pliego[zona]) * 100).toFixed(1)
+      : 0;
 
     html += `
       <tr>
