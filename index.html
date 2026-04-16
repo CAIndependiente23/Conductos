@@ -148,6 +148,7 @@ async function cargarDatos() {
         skipEmptyLines: true,
         complete: r => {
           resolve(r.data.map(d => {
+
             let mes = parseMes(getColumna(d,"Certificado MES"));
 
             return {
@@ -232,8 +233,8 @@ function renderTabla(data){
 
   Object.keys(data).forEach(z=>{
     let d=data[z];
-    let p=((d.longitud/pliego[z])*100||0).toFixed(1);
-    let falt=pliego[z]-d.longitud;
+    let p = ((d.longitud/pliego[z])*100 || 0).toFixed(1);
+    let falt = pliego[z] - d.longitud;
 
     html+=`<tr>
     <td>${z}</td>
@@ -250,7 +251,7 @@ function renderTabla(data){
   document.getElementById("tablaResumen").innerHTML=html;
 }
 
-// GRAFICO LIMPIO
+// GRAFICO (FIX %)
 function renderGrafico(data){
 
   let ctx=document.getElementById("graficoZonas").getContext("2d");
@@ -258,7 +259,10 @@ function renderGrafico(data){
   if(chart) chart.destroy();
 
   let zonas=Object.keys(data);
-  let vals=zonas.map(z=>(data[z].longitud/pliego[z])*100||0);
+
+  let vals=zonas.map(z =>
+    Number(((data[z].longitud / pliego[z]) * 100).toFixed(1))
+  );
 
   chart=new Chart(ctx,{
     type:"bar",
@@ -289,6 +293,13 @@ function renderGrafico(data){
         legend:{
           labels:{
             filter:(item)=>item.text!=="Meta 100%"
+          }
+        },
+        tooltip:{
+          callbacks:{
+            label:function(context){
+              return context.dataset.label + ": " + Number(context.raw).toFixed(1) + "%";
+            }
           }
         }
       },
