@@ -6,8 +6,6 @@
 
 <script src="https://cdn.jsdelivr.net/npm/papaparse@5.3.2/papaparse.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
 
 <style>
 body { font-family: Arial; margin: 20px; }
@@ -31,10 +29,8 @@ th { background:#eee; }
 
 .faltante { background:#ffd6d6; }
 
-#map { height: 400px; margin-top: 20px; }
-
 #graficoWrap{
-  width: 60%;
+  width: 70%;
   margin: 20px auto;
 }
 </style>
@@ -56,10 +52,7 @@ th { background:#eee; }
   <canvas id="grafico"></canvas>
 </div>
 
-<h3>Mapa</h3>
-<div id="map"></div>
-
-<h3>Detalle</h3>
+<h3>Detalle de Registros</h3>
 
 <select id="zona">
   <option value="TODAS">Todas</option>
@@ -77,16 +70,14 @@ th { background:#eee; }
 <script>
 
 // ================= STATE =================
-let mode = "mes";
-let mesActual = null;
+let modo = "mes";
+let mesSeleccionado = null;
 
 // ================= DATA =================
 let datos = [];
 let chart;
-let map;
-let markers = [];
 
-// ================= CONFIG =================
+// ================= URLS =================
 const URLS = {
  "Zona 1":"https://docs.google.com/spreadsheets/d/1HIJJCVYnwaDdAvgxfI4tBA-5wn_0B1Bog19cUgJYyuo/export?format=csv&gid=2037627206",
  "Zona 2":"https://docs.google.com/spreadsheets/d/1_uR77zitjM6EpbPlmhg92VaNteJuYb28hQkDKbWX2V4/export?format=csv&gid=1607259408",
@@ -163,23 +154,19 @@ async function load(){
 
  datos=(await Promise.all(prom)).flat().filter(d=>d.mes);
 
- init();
  buildButtons();
  render();
 }
 
-// ================= FILTER =================
+// ================= DATA FILTER =================
 function dataset(){
-
- if(mode==="buscador") return datos;
-
- return datos.filter(d=>d.mes.key===mesActual);
+ if(modo==="buscador") return datos;
+ return datos.filter(d=>d.mes.key===mesSeleccionado);
 }
 
-// ================= RENDER MAIN =================
+// ================= RENDER =================
 function render(){
  let d=dataset();
-
  renderResumen(d);
  renderGrafico(d);
  renderDetalle(d);
@@ -197,7 +184,7 @@ function renderResumen(d){
   }
  });
 
- let html="<table><tr><th>Zona</th><th>% Avance</th></tr>";
+ let html="<table><tr><th>Zona</th><th>%</th></tr>";
 
  Object.keys(res).forEach(z=>{
   let p=(res[z]/pliego[z]*100||0).toFixed(1);
@@ -208,7 +195,7 @@ function renderResumen(d){
  document.getElementById("resumen").innerHTML=html;
 }
 
-// ================= GRAFICO (FIX SIZE) =================
+// ================= GRAFICO =================
 function renderGrafico(d){
 
  if(chart) chart.destroy();
@@ -227,30 +214,19 @@ function renderGrafico(d){
   data:{
    labels:zonas,
    datasets:[
-    {
-     data:vals,
-     backgroundColor:["#FFD700","#007BFF","#FF69B4","#28A745","#FF8C00"]
-    },
-    {
-     type:"line",
-     data:zonas.map(()=>100),
-     borderDash:[6,6],
-     borderColor:"#999",
-     pointRadius:0
-    }
+    {data:vals,backgroundColor:["#FFD700","#007BFF","#FF69B4","#28A745","#FF8C00"]},
+    {type:"line",data:zonas.map(()=>100),borderDash:[6,6],borderColor:"#999",pointRadius:0}
    ]
   },
   options:{
-   responsive:true,
-   maintainAspectRatio:false,
-   plugins:{legend:{display:false}},
    indexAxis:"y",
+   plugins:{legend:{display:false}},
    scales:{x:{max:120}}
   }
  });
 }
 
-// ================= DETALLE (FIX COMPLETO CAMPOS) =================
+// ================= DETALLE =================
 function renderDetalle(d){
 
  let z=document.getElementById("zona").value;
@@ -310,8 +286,8 @@ function buildButtons(){
   b.innerText=m.label;
 
   b.onclick=()=>{
-   mode="mes";
-   mesActual=m.key;
+   modo="mes";
+   mesSeleccionado=m.key;
    render();
   };
 
@@ -321,16 +297,11 @@ function buildButtons(){
 
 // ================= BUSCADOR =================
 function setBuscador(){
- mode="buscador";
+ modo="buscador";
  render();
 }
 
 // ================= INIT =================
-function init(){
- map=L.map("map").setView([-34.6,-58.38],11);
- L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png").addTo(map);
-}
-
 load();
 
 </script>
