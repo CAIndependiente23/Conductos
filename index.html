@@ -9,18 +9,10 @@
 <style>
 body { font-family: Arial; margin: 20px; }
 
-h2 { margin-bottom: 10px; }
-
 .botones button {
   margin: 5px;
   padding: 6px 10px;
   cursor: pointer;
-  border: 1px solid #ccc;
-  background: #f5f5f5;
-}
-
-.botones button:hover {
-  background: #ddd;
 }
 
 table {
@@ -48,10 +40,8 @@ th { background: #eee; }
 
 <script>
 
-// 🔗 CSV GOOGLE SHEETS
 const URL_CSV = "https://docs.google.com/spreadsheets/d/1OsRXS125K9GfH24Qa6nriI4-MUeQB_OWWhJBdi1arw0/export?format=csv&gid=0";
 
-// 📊 PLIEGO
 const pliego = {
   "Zona 1": 2590,
   "Zona 2": 15246,
@@ -63,14 +53,14 @@ const pliego = {
 let datosGlobal = [];
 let certificadoSeleccionado = null;
 
-// 🔧 Normalizar texto
+// 🔧 normalizar texto
 function limpiarTexto(txt) {
   if (!txt) return "";
   return txt.toString().trim().toUpperCase()
     .normalize("NFD").replace(/[\u0300-\u036f]/g, "");
 }
 
-// 🔧 Convertir zona 1–5 → Zona X
+// 🔧 zona
 function normalizarZona(z) {
   if (!z) return null;
 
@@ -85,7 +75,7 @@ function normalizarZona(z) {
   return null;
 }
 
-// 📅 Parse fecha argentina
+// 📅 fecha
 function parseFecha(fechaStr) {
   if (!fechaStr) return null;
 
@@ -95,7 +85,12 @@ function parseFecha(fechaStr) {
   return new Date(partes[2], partes[1]-1, partes[0]);
 }
 
-// 📥 Cargar CSV
+// 🔽 meses válidos (desde septiembre)
+const mesesValidos = [
+  "SEPTIEMBRE","OCTUBRE","NOVIEMBRE","DICIEMBRE"
+];
+
+// 📥 cargar CSV
 Papa.parse(URL_CSV, {
   download: true,
   header: true,
@@ -105,12 +100,15 @@ Papa.parse(URL_CSV, {
   }
 });
 
-// 🔘 Botonera por Certificado MES
+// 🔘 BOTONES
 function crearBotones() {
   const cont = document.getElementById("botonesMes");
 
   let certificados = [...new Set(
-    datosGlobal.map(d => d["Certificado MES"]).filter(Boolean)
+    datosGlobal
+      .map(d => d["Certificado MES"])
+      .filter(Boolean)
+      .filter(m => mesesValidos.includes(limpiarTexto(m)))
   )];
 
   certificados.forEach(c => {
@@ -126,7 +124,7 @@ function crearBotones() {
   });
 }
 
-// 🧠 Calcular métricas
+// 🧠 CALCULAR
 function calcular() {
 
   let filtrados = datosGlobal.filter(d => d["Certificado MES"] === certificadoSeleccionado);
@@ -160,49 +158,42 @@ function calcular() {
     }
 
     if (estado.includes("RECHAZ")) {
-      resultado[zona].rechazados++;
+      resultado[zona].rechazados += longitud; // 🔥 CAMBIO
     }
 
     if (estado.includes("REVISION")) {
-      resultado[zona].revision++;
+      resultado[zona].revision += longitud; // 🔥 CAMBIO
     }
   });
 
   renderTabla(resultado);
 }
 
-// 📊 Render tabla
+// 📊 TABLA
 function renderTabla(data) {
 
-  let html = `
-  <table>
+  let html = `<table>
     <tr>
       <th>Zona</th>
       <th>Longitud Aprobada</th>
       <th>% Pliego</th>
       <th>Última Aprobación</th>
-      <th>Rechazados</th>
-      <th>En Revisión</th>
-    </tr>
-  `;
+      <th>Longitud Rechazada</th>
+      <th>Longitud en Revisión</th>
+    </tr>`;
 
-  Object.keys(data).forEach(zona => {
-    let d = data[zona];
+  Object.keys(data).forEach(z => {
+    let d = data[z];
+    let porcentaje = ((d.longitud / pliego[z]) * 100 || 0).toFixed(1);
 
-    let porcentaje = pliego[zona]
-      ? ((d.longitud / pliego[zona]) * 100).toFixed(1)
-      : 0;
-
-    html += `
-      <tr>
-        <td>${zona}</td>
-        <td>${d.longitud.toFixed(0)}</td>
-        <td>${porcentaje}%</td>
-        <td>${d.ultimaFecha ? d.ultimaFecha.toLocaleDateString() : "-"}</td>
-        <td>${d.rechazados}</td>
-        <td>${d.revision}</td>
-      </tr>
-    `;
+    html += `<tr>
+      <td>${z}</td>
+      <td>${d.longitud.toFixed(0)}</td>
+      <td>${porcentaje}%</td>
+      <td>${d.ultimaFecha ? d.ultimaFecha.toLocaleDateString() : "-"}</td>
+      <td>${d.rechazados.toFixed(0)}</td>
+      <td>${d.revision.toFixed(0)}</td>
+    </tr>`;
   });
 
   html += `</table>`;
