@@ -1,1 +1,176 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<title>Dashboard Pluvial</title>
 
+<script src="https://cdn.jsdelivr.net/npm/papaparse@5.3.2/papaparse.min.js"></script>
+
+<style>
+body { font-family: Arial; margin: 20px; }
+
+.botones button {
+  margin: 5px;
+  padding: 6px 10px;
+  cursor: pointer;
+}
+
+table {
+  border-collapse: collapse;
+  width: 100%;
+  margin-top: 20px;
+}
+
+th, td {
+  border: 1px solid #ccc;
+  padding: 6px;
+  text-align: center;
+}
+
+th { background: #eee; }
+
+.kpi {
+  margin-top: 15px;
+  font-weight: bold;
+}
+</style>
+</head>
+
+<body>
+
+<h2>Dashboard por Zona</h2>
+
+<div class="botones" id="botonesMes"></div>
+
+<div id="tablaResumen"></div>
+
+<script>
+const URL_CSV = "https://docs.google.com/spreadsheets/d/1OsRXS125K9GfH24Qa6nriI4-MUeQB_OWWhJBdi1arw0/export?format=csv&gid=0";
+
+// 🔹 CONSTANTES DE PLIEGO
+const pliego = {
+  "Zona 1": 2590,
+  "Zona 2": 15246,
+  "Zona 3": 16238,
+  "Zona 4": 9980,
+  "Zona 5": 8309
+};
+
+let datosGlobal = [];
+let mesSeleccionado = null;
+
+// 🔹 Cargar CSV
+Papa.parse(URL_CSV, {
+  download: true,
+  header: true,
+  complete: function(results) {
+    datosGlobal = results.data;
+    crearBotonesMes();
+  }
+});
+
+// 🔹 Obtener mes desde fecha
+function obtenerMes(fechaStr) {
+  let fecha = new Date(fechaStr);
+  if (isNaN(fecha)) return null;
+  return fecha.getMonth(); // 0-11
+}
+
+// 🔹 Crear botonera
+function crearBotonesMes() {
+  const cont = document.getElementById("botonesMes");
+
+  let meses = [...new Set(datosGlobal.map(d => obtenerMes(d["Fecha"])))].filter(m => m !== null);
+
+  meses.sort((a,b)=>a-b);
+
+  meses.forEach(m => {
+    let btn = document.createElement("button");
+    btn.innerText = "Mes " + (m+1);
+    btn.onclick = () => {
+      mesSeleccionado = m;
+      calcular();
+    };
+    cont.appendChild(btn);
+  });
+}
+
+// 🔹 Calcular todo
+function calcular() {
+
+  let filtrados = datosGlobal.filter(d => obtenerMes(d["Fecha"]) === mesSeleccionado);
+
+  let resultado = {};
+
+  Object.keys(pliego).forEach(zona => {
+    resultado[zona] = {
+      longitud: 0,
+      rechazados: 0,
+      revision: 0,
+      ultimaFecha: null
+    };
+  });
+
+  filtrados.forEach(d => {
+    let zona = d["Zona"];
+    let estado = (d["Estado"] || "").toUpperCase();
+    let longitud = parseFloat(d["Longitud"]) || 0;
+    let fecha = new Date(d["Fecha"]);
+
+    if (!resultado[zona]) return;
+
+    if (estado === "APROBADO") {
+      resultado[zona].longitud += longitud;
+
+      if (!resultado[zona].ultimaFecha || fecha > resultado[zona].ultimaFecha) {
+        resultado[zona].ultimaFecha = fecha;
+      }
+    }
+
+    if (estado === "RECHAZADO") {
+      resultado[zona].rechazados++;
+    }
+
+    if (estado === "EN REVISION") {
+      resultado[zona].revision++;
+    }
+  });
+
+  renderTabla(resultado);
+}
+
+// 🔹 Render tabla
+function renderTabla(data) {
+
+  let html = `<table>
+  <tr>
+    <th>Zona</th>
+    <th>Longitud Aprobada</th>
+    <th>% Pliego</th>
+    <th>Última Aprobación</th>
+    <th>Rechazados</th>
+    <th>En Revisión</th>
+  </tr>`;
+
+  Object.keys(data).forEach(zona => {
+    let d = data[zona];
+    let porcentaje = ((d.longitud / pliego[zona]) * 100 || 0).toFixed(1);
+
+    html += `<tr>
+      <td>${zona}</td>
+      <td>${d.longitud.toFixed(0)}</td>
+      <td>${porcentaje}%</td>
+      <td>${d.ultimaFecha ? d.ultimaFecha.toLocaleDateString() : "-"}</td>
+      <td>${d.rechazados}</td>
+      <td>${d.revision}</td>
+    </tr>`;
+  });
+
+  html += `</table>`;
+
+  document.getElementById("tablaResumen").innerHTML = html;
+}
+</script>
+
+</body>
+</html>
