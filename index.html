@@ -49,6 +49,9 @@ th { background: #eee; }
   <canvas id="graficoZonas"></canvas>
 </div>
 
+<h3>Detalle de Registros</h3>
+<div id="tablaDetalle"></div>
+
 <script>
 
 // 🔗 LINKS
@@ -121,7 +124,7 @@ function parseMes(texto) {
   };
 }
 
-// 📥 cargar
+// 📥 cargar datos
 async function cargarDatos() {
 
   let promesas = Object.entries(URLS_ZONAS).map(([zona, url]) => {
@@ -143,7 +146,16 @@ async function cargarDatos() {
               mesLabel: mes?.label,
               estado: getColumna(d, "Aprobación"),
               longitud: getColumna(d, "Longitud"),
-              fecha: getColumna(d, "Marca temporal")
+              fecha: getColumna(d, "Marca temporal"),
+
+              comuna: getColumna(d, "Comuna"),
+              calle: getColumna(d, "Calle de traza"),
+              inicio: getColumna(d, "Intersección Inicio"),
+              fin: getColumna(d, "Intersección Fin"),
+              diametro: getColumna(d, "Diámetro"),
+              foto1: getColumna(d, "Foto Bajada I (Inicio)"),
+              foto2: getColumna(d, "Foto Bajada II (Fin)"),
+              foto3: getColumna(d, "Foto BR")
             };
 
           });
@@ -229,9 +241,10 @@ function calcular() {
 
   renderTabla(resultado);
   renderGrafico(resultado);
+  renderDetalle(filtrados);
 }
 
-// 📊 tabla
+// 📊 tabla resumen
 function renderTabla(data) {
 
   let html = `<table>
@@ -265,7 +278,7 @@ function renderTabla(data) {
   document.getElementById("tablaResumen").innerHTML = html;
 }
 
-// 📈 gráfico (FIX DEFINITIVO)
+// 📈 gráfico (igual al estable anterior)
 function renderGrafico(data) {
 
   const canvas = document.getElementById("graficoZonas");
@@ -283,63 +296,70 @@ function renderGrafico(data) {
       labels: zonas,
       datasets: [
         {
-          label: '% Ejecutado',
           data: porcentajes,
-          backgroundColor: [
-            '#FFD700',
-            '#007BFF',
-            '#FF69B4',
-            '#28A745',
-            '#FF8C00'
-          ]
+          backgroundColor: ['#FFD700','#007BFF','#FF69B4','#28A745','#FF8C00']
         },
         {
           type: 'line',
-          label: '100%',
           data: zonas.map(() => 100),
           borderDash: [5,5],
-          borderColor: '#000',
-          fill: false
+          borderColor: '#000'
         }
       ]
     },
     options: {
       indexAxis: 'y',
-      responsive: true,
       animation: false,
-      scales: {
-        x: {
-          beginAtZero: true,
-          title: {
-            display: true,
-            text: '% del Pliego'
-          }
-        }
-      }
-    },
-    plugins: [{
-      afterDraw: function(chartInstance) {
-        const ctx = chartInstance.ctx;
-
-        ctx.font = '12px Arial';
-        ctx.textAlign = 'center';
-        ctx.fillStyle = '#000';
-
-        chartInstance.data.datasets[0].data.forEach((value, index) => {
-
-          if (value === 0 || value >= 100) return;
-
-          const meta = chartInstance.getDatasetMeta(0);
-          const bar = meta.data[index];
-
-          let x = bar.x - 25;
-          let y = bar.y + 4;
-
-          ctx.fillText(value.toFixed(1) + '%', x, y);
-        });
-      }
-    }]
+      scales: { x: { beginAtZero: true } }
+    }
   });
+}
+
+// 📋 detalle
+function renderDetalle(filtrados) {
+
+  const MAX = 150;
+  let datos = filtrados.slice(0, MAX);
+
+  let html = `<table>
+    <tr>
+      <th>Zona</th>
+      <th>Comuna</th>
+      <th>Calle</th>
+      <th>Inicio</th>
+      <th>Fin</th>
+      <th>Diámetro</th>
+      <th>Longitud</th>
+      <th>Aprobación</th>
+      <th>Fotos</th>
+    </tr>`;
+
+  datos.forEach(d => {
+
+    html += `<tr>
+      <td>${d.Zona}</td>
+      <td>${d.comuna || "-"}</td>
+      <td>${d.calle || "-"}</td>
+      <td>${d.inicio || "-"}</td>
+      <td>${d.fin || "-"}</td>
+      <td>${d.diametro || "-"}</td>
+      <td>${parseNumero(d.longitud).toFixed(0)}</td>
+      <td>${d.estado || "-"}</td>
+      <td>
+        ${d.foto1 ? `<a href="${d.foto1}" target="_blank">I</a>` : ""}
+        ${d.foto2 ? `<a href="${d.foto2}" target="_blank">II</a>` : ""}
+        ${d.foto3 ? `<a href="${d.foto3}" target="_blank">BR</a>` : ""}
+      </td>
+    </tr>`;
+  });
+
+  html += `</table>`;
+
+  if (filtrados.length > MAX) {
+    html += `<p>Mostrando ${MAX} de ${filtrados.length} registros</p>`;
+  }
+
+  document.getElementById("tablaDetalle").innerHTML = html;
 }
 
 // 🚀 iniciar
