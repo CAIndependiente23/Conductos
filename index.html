@@ -30,7 +30,9 @@ th, td {
 
 th { background: #eee; }
 
-.faltante { background-color: #ffcccc; }
+.faltante {
+  background-color: #ffcccc;
+}
 </style>
 </head>
 
@@ -41,6 +43,7 @@ th { background: #eee; }
 <div id="loading">Cargando datos...</div>
 
 <div class="botones" id="botonesMes"></div>
+
 <div id="tablaResumen"></div>
 
 <div style="width: 80%; margin: 40px auto;">
@@ -115,21 +118,22 @@ function parseFecha(f) {
   return new Date(p[2], p[1]-1, p[0]);
 }
 
-// PARSE MES
+// MES
 function parseMes(texto) {
   const meses = ["ENERO","FEBRERO","MARZO","ABRIL","MAYO","JUNIO","JULIO","AGOSTO","SEPTIEMBRE","OCTUBRE","NOVIEMBRE","DICIEMBRE"];
   const corto = ["ENE","FEB","MAR","ABR","MAY","JUN","JUL","AGO","SEP","OCT","NOV","DIC"];
 
   let t = limpiarTexto(texto);
-  let mesIndex = meses.findIndex(m => t.includes(m));
-  let year = (t.match(/\d{4}/) || [])[0];
+  let i = meses.findIndex(m => t.includes(m));
+  let y = (t.match(/\d{4}/) || [])[0];
 
-  if (mesIndex < 0 || !year) return null;
+  if (i < 0 || !y) return null;
 
-  let fecha = new Date(year, mesIndex, 1);
+  let fecha = new Date(y, i, 1);
+
   return {
     key: fecha.getTime(),
-    label: corto[mesIndex] + "-" + year.slice(2)
+    label: corto[i] + "-" + y.slice(2)
   };
 }
 
@@ -145,6 +149,7 @@ async function cargarDatos() {
         complete: r => {
           resolve(r.data.map(d => {
             let mes = parseMes(getColumna(d,"Certificado MES"));
+
             return {
               Zona: zona,
               mesKey: mes?.key,
@@ -174,7 +179,7 @@ async function cargarDatos() {
   crearBotones();
 }
 
-// BOTONES
+// BOTONES MES
 function crearBotones() {
 
   let meses = [...new Map(datosGlobal.map(d => [d.mesKey,d])).values()]
@@ -218,8 +223,9 @@ function calcular() {
   renderDetalle(filtrados);
 }
 
-// TABLA RESUMEN
+// TABLA
 function renderTabla(data){
+
   let html=`<table><tr>
   <th>Zona</th><th>Aprobado</th><th>%</th><th>Faltantes</th>
   <th>Última</th><th>Rechazado</th><th>Revisión</th></tr>`;
@@ -244,8 +250,9 @@ function renderTabla(data){
   document.getElementById("tablaResumen").innerHTML=html;
 }
 
-// GRAFICO
+// GRAFICO LIMPIO
 function renderGrafico(data){
+
   let ctx=document.getElementById("graficoZonas").getContext("2d");
 
   if(chart) chart.destroy();
@@ -258,11 +265,37 @@ function renderGrafico(data){
     data:{
       labels:zonas,
       datasets:[
-        {data:vals,backgroundColor:['#FFD700','#007BFF','#FF69B4','#28A745','#FF8C00']},
-        {type:'line',data:zonas.map(()=>100),borderDash:[5,5],borderColor:'#000'}
+        {
+          label:"Avance %",
+          data:vals,
+          backgroundColor:['#FFD700','#007BFF','#FF69B4','#28A745','#FF8C00']
+        },
+        {
+          label:"Meta 100%",
+          type:"line",
+          data:zonas.map(()=>100),
+          borderDash:[6,6],
+          borderColor:"rgba(0,0,0,0.25)",
+          pointRadius:0,
+          borderWidth:2,
+          fill:false
+        }
       ]
     },
-    options:{indexAxis:'y',animation:false}
+    options:{
+      indexAxis:'y',
+      animation:false,
+      plugins:{
+        legend:{
+          labels:{
+            filter:(item)=>item.text!=="Meta 100%"
+          }
+        }
+      },
+      scales:{
+        x:{suggestedMax:120}
+      }
+    }
   });
 }
 
