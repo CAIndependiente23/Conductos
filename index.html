@@ -180,7 +180,7 @@ async function cargarDatos() {
   crearBotones();
 }
 
-// BOTONES MES
+// BOTONES + BUSCADOR
 function crearBotones() {
 
   let meses = [...new Map(datosGlobal.map(d => [d.mesKey,d])).values()]
@@ -190,10 +190,29 @@ function crearBotones() {
   let cont = document.getElementById("botonesMes");
   cont.innerHTML = "";
 
+  // 🔍 BUSCADOR GLOBAL
+  let btnBuscador = document.createElement("button");
+  btnBuscador.innerText = "🔍 BUSCADOR";
+  btnBuscador.style.fontWeight = "bold";
+
+  btnBuscador.onclick = () => {
+    mesSeleccionado = null;
+    paginaActual = 1;
+    calcular();
+  };
+
+  cont.appendChild(btnBuscador);
+  cont.appendChild(document.createTextNode(" "));
+
+  // MESES
   meses.forEach(m => {
     let b = document.createElement("button");
     b.innerText = m.mesLabel;
-    b.onclick = () => { mesSeleccionado = m.mesKey; paginaActual=1; calcular(); };
+    b.onclick = () => {
+      mesSeleccionado = m.mesKey;
+      paginaActual = 1;
+      calcular();
+    };
     cont.appendChild(b);
   });
 }
@@ -201,7 +220,9 @@ function crearBotones() {
 // CALCULAR
 function calcular() {
 
-  let filtrados = datosGlobal.filter(d => d.mesKey === mesSeleccionado);
+  let filtrados = mesSeleccionado
+    ? datosGlobal.filter(d => d.mesKey === mesSeleccionado)
+    : datosGlobal; // 🔥 BUSCADOR GLOBAL
 
   let res = {};
   Object.keys(pliego).forEach(z => res[z]={longitud:0,rechazados:0,revision:0,ultimaFecha:null});
@@ -251,7 +272,7 @@ function renderTabla(data){
   document.getElementById("tablaResumen").innerHTML=html;
 }
 
-// GRAFICO (FIX %)
+// GRAFICO
 function renderGrafico(data){
 
   let ctx=document.getElementById("graficoZonas").getContext("2d");
@@ -357,7 +378,7 @@ function renderDetalle(filtrados){
   <button onclick="paginaActual++;calcular()" ${paginaActual>=totalPag?"disabled":""}>▶</button>`;
 }
 
-// EVENTOS
+// EVENTS
 document.addEventListener("input",()=>{paginaActual=1;calcular();});
 document.addEventListener("change",()=>{paginaActual=1;calcular();});
 
