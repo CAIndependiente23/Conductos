@@ -40,7 +40,7 @@ th { background: #eee; }
 
 <script>
 
-// 🔗 LINKS CSV
+// 🔗 LINKS
 const URLS_ZONAS = {
   "Zona 1": "https://docs.google.com/spreadsheets/d/1HIJJCVYnwaDdAvgxfI4tBA-5wn_0B1Bog19cUgJYyuo/export?format=csv&gid=1753570479",
   "Zona 2": "https://docs.google.com/spreadsheets/d/1_uR77zitjM6EpbPlmhg92VaNteJuYb28hQkDKbWX2V4/export?format=csv&gid=1607259408",
@@ -59,32 +59,34 @@ const pliego = {
 };
 
 let datosGlobal = [];
-let certificadoSeleccionado = null;
+let mesSeleccionado = null;
 
-// 🔧 limpiar texto
+// 🧠 meses
+const meses = {
+  "ENERO":0,"FEBRERO":1,"MARZO":2,"ABRIL":3,"MAYO":4,"JUNIO":5,
+  "JULIO":6,"AGOSTO":7,"SEPTIEMBRE":8,"OCTUBRE":9,"NOVIEMBRE":10,"DICIEMBRE":11
+};
+
+const mesesCorto = ["ENE","FEB","MAR","ABR","MAY","JUN","JUL","AGO","SEP","OCT","NOV","DIC"];
+
+// 🔧 utils
 function limpiarTexto(txt) {
   if (!txt) return "";
   return txt.toString().trim().toUpperCase()
     .normalize("NFD").replace(/[\u0300-\u036f]/g, "");
 }
 
-// 🔍 obtener columna flexible
 function getColumna(row, nombre) {
-  let keys = Object.keys(row);
-
-  let key = keys.find(k => limpiarTexto(k) === limpiarTexto(nombre));
-
+  let key = Object.keys(row).find(k => limpiarTexto(k) === limpiarTexto(nombre));
   return key ? row[key] : null;
 }
 
-// 🔢 parse número
 function parseNumero(valor) {
   if (!valor) return 0;
   let limpio = valor.toString().replace(/\./g, "").replace(",", ".");
   return parseFloat(limpio) || 0;
 }
 
-// 📅 parse fecha
 function parseFecha(fechaStr) {
   if (!fechaStr) return null;
   let partes = fechaStr.split(" ")[0].split("/");
@@ -92,7 +94,24 @@ function parseFecha(fechaStr) {
   return new Date(partes[2], partes[1]-1, partes[0]);
 }
 
-// 📥 cargar datos
+// 📅 parse MES (CLAVE)
+function parseMes(texto) {
+  let t = limpiarTexto(texto);
+
+  let mesNombre = Object.keys(meses).find(m => t.includes(m));
+  let yearMatch = t.match(/\d{4}/);
+
+  if (!mesNombre || !yearMatch) return null;
+
+  let fecha = new Date(yearMatch[0], meses[mesNombre], 1);
+
+  return {
+    key: fecha.getTime(),
+    label: mesesCorto[fecha.getMonth()] + "-" + fecha.getFullYear().toString().slice(-2)
+  };
+}
+
+// 📥 cargar
 async function cargarDatos() {
 
   let promesas = Object.entries(URLS_ZONAS).map(([zona, url]) => {
@@ -106,9 +125,12 @@ async function cargarDatos() {
 
           let datos = results.data.map(d => {
 
+            let mes = parseMes(getColumna(d, "Certificado MES"));
+
             return {
               Zona: zona,
-              certificado: getColumna(d, "Certificado MES"),
+              mesKey: mes?.key,
+              mesLabel: mes?.label,
               estado: getColumna(d, "Aprobación"),
               longitud: getColumna(d, "Longitud"),
               fecha: getColumna(d, "Marca temporal")
@@ -117,10 +139,6 @@ async function cargarDatos() {
           });
 
           resolve(datos);
-        },
-        error: function(err) {
-          console.error("Error cargando:", zona, err);
-          resolve([]);
         }
       });
 
@@ -128,9 +146,7 @@ async function cargarDatos() {
   });
 
   let resultados = await Promise.all(promesas);
-  datosGlobal = resultados.flat();
-
-  console.log("Datos cargados:", datosGlobal.length);
+  datosGlobal = resultados.flat().filter(d => d.mesKey);
 
   crearBotones();
 }
@@ -141,22 +157,17 @@ function crearBotones() {
   const cont = document.getElementById("botonesMes");
   cont.innerHTML = "";
 
-  let certificados = [...new Set(
-    datosGlobal
-      .map(d => d.certificado)
-      .filter(Boolean)
-      .filter(m => {
-        let txt = limpiarTexto(m);
-        return !txt.includes("JULIO") && !txt.includes("AGOSTO");
-      })
-  )];
+  let mesesUnicos = [...new Map(
+    datosGlobal.map(d => [d.mesKey, d])
+  ).values()]
+  .sort((a,b) => a.mesKey - b.mesKey);
 
-  certificados.forEach(c => {
+  mesesUnicos.forEach(m => {
     let btn = document.createElement("button");
-    btn.innerText = c;
+    btn.innerText = m.mesLabel;
 
     btn.onclick = () => {
-      certificadoSeleccionado = c;
+      mesSeleccionado = m.mesKey;
       calcular();
     };
 
@@ -167,19 +178,12 @@ function crearBotones() {
 // 🧠 calcular
 function calcular() {
 
-  let filtrados = datosGlobal.filter(d => 
-    limpiarTexto(d.certificado) === limpiarTexto(certificadoSeleccionado)
-  );
+  let filtrados = datosGlobal.filter(d => d.mesKey === mesSeleccionado);
 
   let resultado = {};
 
-  Object.keys(pliego).forEach(zona => {
-    resultado[zona] = {
-      longitud: 0,
-      rechazados: 0,
-      revision: 0,
-      ultimaFecha: null
-    };
+  Object.keys(pliego).forEach(z => {
+    resultado[z] = { longitud:0, rechazados:0, revision:0, ultimaFecha:null };
   });
 
   filtrados.forEach(d => {
@@ -189,12 +193,10 @@ function calcular() {
     let longitud = parseNumero(d.longitud);
     let fecha = parseFecha(d.fecha);
 
-    if (!zona || !estado) return;
+    if (!estado) return;
 
-    // ✅ aprobado / 50%
     if (estado === "APROBADO" || estado.includes("50")) {
       let factor = estado.includes("50") ? 0.5 : 1;
-
       resultado[zona].longitud += longitud * factor;
 
       if (fecha && (!resultado[zona].ultimaFecha || fecha > resultado[zona].ultimaFecha)) {
@@ -202,12 +204,10 @@ function calcular() {
       }
     }
 
-    // ❌ rechazado
     if (estado.includes("RECHAZ")) {
       resultado[zona].rechazados += longitud;
     }
 
-    // 🟡 revisión
     if (estado.includes("REVISION")) {
       resultado[zona].revision += longitud;
     }
