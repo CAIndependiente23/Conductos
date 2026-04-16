@@ -12,7 +12,6 @@ body { font-family: Arial; margin: 20px; background:#f6f7fb; }
 
 h2 { margin-bottom: 10px; }
 
-/* BOTONES */
 .botones button {
   margin: 5px;
   padding: 6px 10px;
@@ -39,7 +38,6 @@ table {
   box-shadow: 0 2px 10px rgba(0,0,0,0.08);
 }
 
-/* HEADER */
 th {
   background: #f1f3f6;
   padding: 10px 12px;
@@ -49,42 +47,30 @@ th {
   z-index: 2;
 }
 
-/* CELDAS */
 td {
   padding: 10px 12px;
   font-size: 13px;
   text-align: center;
 }
 
-/* ZEBRA */
 tr:nth-child(even) {
   background-color: #fafafa;
 }
 
-/* HOVER */
 tr:hover {
   background-color: #eef5ff;
 }
 
-/* FALTANTES */
 .faltante {
   background-color: #ffe1e1;
   font-weight: bold;
   color: #a10000;
 }
 
-/* CONTENEDORES */
 #tablaDetalle {
   overflow-x: auto;
 }
 
-#graficoZonas {
-  background: white;
-  padding: 10px;
-  border-radius: 10px;
-}
-
-/* LINKS */
 a {
   color: #2d6cdf;
   text-decoration: none;
@@ -92,6 +78,12 @@ a {
 
 a:hover {
   text-decoration: underline;
+}
+
+#graficoZonas {
+  background: white;
+  padding: 10px;
+  border-radius: 10px;
 }
 </style>
 </head>
@@ -150,9 +142,11 @@ const pliego = {
   "Zona 5": 8309
 };
 
+// ================= STATE =================
 let datosGlobal = [];
+let modo = null; // "mes" | "buscador"
 let mesSeleccionado = null;
-let modoBuscador = false;
+
 let chart = null;
 let paginaActual = 1;
 const POR_PAGINA = 100;
@@ -198,7 +192,7 @@ function parseMes(texto) {
   };
 }
 
-// ================= CARGA =================
+// ================= LOAD =================
 async function cargarDatos() {
 
   let promesas = Object.entries(URLS_ZONAS).map(([zona, url]) =>
@@ -233,26 +227,38 @@ async function cargarDatos() {
   document.getElementById("loading").style.display = "none";
 
   crearBotones();
-  calcular();
 }
 
 // ================= BOTONES =================
 function crearBotones() {
 
+  let cont = document.getElementById("botonesMes");
+  cont.innerHTML = "";
+
+  // BUSCADOR
+  let b = document.createElement("button");
+  b.innerText = "🔍 BUSCADOR GLOBAL";
+  b.onclick = () => {
+    modo = "buscador";
+    mesSeleccionado = null;
+    calcular();
+  };
+  cont.appendChild(b);
+
+  cont.appendChild(document.createTextNode(" "));
+
+  // MESES
   let meses = [...new Map(datosGlobal.map(d => [d.mes.key,d.mes])).values()]
     .sort((a,b)=>a.key-b.key)
     .filter(m => m.label !== "JUL-25" && m.label !== "AGO-25");
-
-  let cont = document.getElementById("botonesMes");
-  cont.innerHTML = "";
 
   meses.forEach(m => {
     let b = document.createElement("button");
     b.innerText = m.label;
 
     b.onclick = () => {
+      modo = "mes";
       mesSeleccionado = m.key;
-      modoBuscador = false;
       calcular();
     };
 
@@ -260,12 +266,20 @@ function crearBotones() {
   });
 }
 
-// ================= CALCULO =================
+// ================= CALCULAR =================
 function calcular() {
 
-  let filtrados = mesSeleccionado
-    ? datosGlobal.filter(d => d.mes.key === mesSeleccionado)
-    : datosGlobal;
+  if (!modo) return;
+
+  let filtrados = [];
+
+  if (modo === "mes") {
+    filtrados = datosGlobal.filter(d => d.mes.key === mesSeleccionado);
+  }
+
+  if (modo === "buscador") {
+    filtrados = datosGlobal;
+  }
 
   let res = {};
   Object.keys(pliego).forEach(z => res[z]={longitud:0,rechazados:0,revision:0,ultimaFecha:null});
