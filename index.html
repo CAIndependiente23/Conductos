@@ -5,6 +5,7 @@
 <title>Limpieza de Conductos</title>
 
 <script src="https://cdn.jsdelivr.net/npm/papaparse@5.3.2/papaparse.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
 <style>
 body { font-family: Arial; margin: 20px; }
@@ -42,6 +43,8 @@ th { background: #eee; }
 <div class="botones" id="botonesMes"></div>
 <div id="tablaResumen"></div>
 
+<canvas id="graficoZonas" height="120"></canvas>
+
 <script>
 
 // 🔗 LINKS
@@ -64,6 +67,7 @@ const pliego = {
 
 let datosGlobal = [];
 let mesSeleccionado = null;
+let chart = null;
 
 // 🧠 meses
 const meses = {
@@ -218,6 +222,7 @@ function calcular() {
   });
 
   renderTabla(resultado);
+  renderGrafico(resultado);
 }
 
 // 📊 tabla
@@ -251,8 +256,51 @@ function renderTabla(data) {
   });
 
   html += `</table>`;
-
   document.getElementById("tablaResumen").innerHTML = html;
+}
+
+// 📈 gráfico
+function renderGrafico(data) {
+
+  const ctx = document.getElementById("graficoZonas");
+
+  let zonas = Object.keys(data);
+  let porcentajes = zonas.map(z => (data[z].longitud / pliego[z]) * 100 || 0);
+
+  if (chart) chart.destroy();
+
+  chart = new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels: zonas,
+      datasets: [
+        {
+          label: '% Ejecutado',
+          data: porcentajes
+        },
+        {
+          type: 'line',
+          label: '100%',
+          data: zonas.map(() => 100),
+          borderDash: [5,5],
+          fill: false
+        }
+      ]
+    },
+    options: {
+      indexAxis: 'y',
+      responsive: true,
+      scales: {
+        x: {
+          beginAtZero: true,
+          title: {
+            display: true,
+            text: '% del Pliego'
+          }
+        }
+      }
+    }
+  });
 }
 
 // 🚀 iniciar
