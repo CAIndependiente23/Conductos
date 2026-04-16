@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
 <meta charset="UTF-8">
-<title>Dashboard por Zona</title>
+<title>Limpieza de Conductos</title>
 
 <script src="https://cdn.jsdelivr.net/npm/papaparse@5.3.2/papaparse.min.js"></script>
 
@@ -37,7 +37,7 @@ th { background: #eee; }
 
 <body>
 
-<h2>Dashboard por Zona</h2>
+<h2>Limpieza de Conductos</h2>
 
 <div class="botones" id="botonesMes"></div>
 <div id="tablaResumen"></div>
@@ -162,7 +162,8 @@ function crearBotones() {
   let mesesUnicos = [...new Map(
     datosGlobal.map(d => [d.mesKey, d])
   ).values()]
-  .sort((a,b) => a.mesKey - b.mesKey);
+  .sort((a,b) => a.mesKey - b.mesKey)
+  .filter(m => m.mesLabel !== "JUL-25" && m.mesLabel !== "AGO-25");
 
   mesesUnicos.forEach(m => {
     let btn = document.createElement("button");
