@@ -40,7 +40,14 @@ th { background: #eee; }
 
 <script>
 
-const URL_CSV = "https://docs.google.com/spreadsheets/d/1OsRXS125K9GfH24Qa6nriI4-MUeQB_OWWhJBdi1arw0/export?format=csv&gid=0";
+// 🔗 LINKS CSV (convertidos automáticamente)
+const URLS_ZONAS = {
+  "Zona 1": "https://docs.google.com/spreadsheets/d/1HIJJCVYnwaDdAvgxfI4tBA-5wn_0B1Bog19cUgJYyuo/export?format=csv&gid=1753570479",
+  "Zona 2": "https://docs.google.com/spreadsheets/d/1_uR77zitjM6EpbPlmhg92VaNteJuYb28hQkDKbWX2V4/export?format=csv&gid=1607259408",
+  "Zona 3": "https://docs.google.com/spreadsheets/d/1Li4R4gjFHbFwryFgteY5KS3y43MGdiqL5zEu4NK_v6w/export?format=csv&gid=996112756",
+  "Zona 4": "https://docs.google.com/spreadsheets/d/1AZAvTvfohVXr8qKlZuejzD1FXHO5T2itzG8rZpbkVUc/export?format=csv&gid=184101373",
+  "Zona 5": "https://docs.google.com/spreadsheets/d/1gaPIk0bPccxj1Wi853iEzvPN3OhE92L1cHgMYJYgztI/export?format=csv&gid=1465503285"
+};
 
 // 📊 PLIEGO
 const pliego = {
@@ -54,55 +61,61 @@ const pliego = {
 let datosGlobal = [];
 let certificadoSeleccionado = null;
 
-// 🔧 normalizar texto
+// 🔧 limpiar texto
 function limpiarTexto(txt) {
   if (!txt) return "";
   return txt.toString().trim().toUpperCase()
     .normalize("NFD").replace(/[\u0300-\u036f]/g, "");
 }
 
-// 🔧 zona
-function normalizarZona(z) {
-  if (!z) return null;
-  let num = z.toString().replace(/\D/g, "");
-  if (["1","2","3","4","5"].includes(num)) return "Zona " + num;
-  return null;
-}
-
-// 🔢 parse número (formato argentino)
+// 🔢 parse número
 function parseNumero(valor) {
   if (!valor) return 0;
-
-  let limpio = valor.toString()
-    .replace(/\./g, "")
-    .replace(",", ".");
-
+  let limpio = valor.toString().replace(/\./g, "").replace(",", ".");
   return parseFloat(limpio) || 0;
 }
 
 // 📅 parse fecha
 function parseFecha(fechaStr) {
   if (!fechaStr) return null;
-
   let partes = fechaStr.split(" ")[0].split("/");
   if (partes.length !== 3) return null;
-
   return new Date(partes[2], partes[1]-1, partes[0]);
 }
 
-// 📥 cargar CSV
-Papa.parse(URL_CSV, {
-  download: true,
-  header: true,
-  complete: function(results) {
-    datosGlobal = results.data;
-    crearBotones();
-  }
-});
+// 📥 cargar todas las zonas
+async function cargarDatos() {
 
-// 🔘 BOTONES (sin julio/agosto)
+  let promesas = Object.entries(URLS_ZONAS).map(([zona, url]) => {
+    return new Promise(resolve => {
+
+      Papa.parse(url, {
+        download: true,
+        header: true,
+        complete: function(results) {
+
+          let datos = results.data.map(d => ({
+            ...d,
+            Zona: zona
+          }));
+
+          resolve(datos);
+        }
+      });
+
+    });
+  });
+
+  let resultados = await Promise.all(promesas);
+  datosGlobal = resultados.flat();
+
+  crearBotones();
+}
+
+// 🔘 botones
 function crearBotones() {
   const cont = document.getElementById("botonesMes");
+  cont.innerHTML = "";
 
   let certificados = [...new Set(
     datosGlobal
@@ -127,7 +140,7 @@ function crearBotones() {
   });
 }
 
-// 🧠 CALCULAR
+// 🧠 calcular
 function calcular() {
 
   let filtrados = datosGlobal.filter(d => 
@@ -147,14 +160,14 @@ function calcular() {
 
   filtrados.forEach(d => {
 
-    let zona = normalizarZona(d["Zona"]);
+    let zona = d["Zona"];
     let estado = limpiarTexto(d["Aprobación"]);
     let longitud = parseNumero(d["Longitud"]);
     let fecha = parseFecha(d["Marca temporal"]);
 
     if (!zona) return;
 
-    // ✅ APROBADO o 50%
+    // ✅ aprobado / 50%
     if (estado === "APROBADO" || estado.includes("50")) {
       let factor = estado.includes("50") ? 0.5 : 1;
 
@@ -165,12 +178,12 @@ function calcular() {
       }
     }
 
-    // ❌ RECHAZADO
+    // ❌ rechazado
     if (estado.includes("RECHAZ")) {
       resultado[zona].rechazados += longitud;
     }
 
-    // 🟡 EN REVISION
+    // 🟡 revisión
     if (estado.includes("REVISION")) {
       resultado[zona].revision += longitud;
     }
@@ -180,7 +193,7 @@ function calcular() {
   renderTabla(resultado);
 }
 
-// 📊 TABLA
+// 📊 tabla
 function renderTabla(data) {
 
   let html = `<table>
@@ -189,8 +202,8 @@ function renderTabla(data) {
       <th>Longitud Aprobada</th>
       <th>% Pliego</th>
       <th>Última Aprobación</th>
-      <th>Longitud Rechazada</th>
-      <th>Longitud en Revisión</th>
+      <th>Rechazado</th>
+      <th>En Revisión</th>
     </tr>`;
 
   Object.keys(data).forEach(z => {
@@ -211,6 +224,9 @@ function renderTabla(data) {
 
   document.getElementById("tablaResumen").innerHTML = html;
 }
+
+// 🚀 iniciar
+cargarDatos();
 
 </script>
 
