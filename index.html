@@ -30,9 +30,7 @@ th, td {
 
 th { background: #eee; }
 
-.faltante {
-  background-color: #ffcccc;
-}
+.faltante { background-color: #ffcccc; }
 </style>
 </head>
 
@@ -50,11 +48,28 @@ th { background: #eee; }
 </div>
 
 <h3>Detalle de Registros</h3>
+
+<div style="margin-bottom:10px;">
+  <label>Zona:</label>
+  <select id="filtroZona">
+    <option value="TODAS">Todas</option>
+    <option>Zona 1</option>
+    <option>Zona 2</option>
+    <option>Zona 3</option>
+    <option>Zona 4</option>
+    <option>Zona 5</option>
+  </select>
+
+  <label style="margin-left:20px;">Buscar calle:</label>
+  <input type="text" id="buscadorCalle" placeholder="Ej: Corrientes">
+</div>
+
 <div id="tablaDetalle"></div>
+<div id="paginado"></div>
 
 <script>
 
-// 🔗 LINKS
+// LINKS
 const URLS_ZONAS = {
   "Zona 1": "https://docs.google.com/spreadsheets/d/1HIJJCVYnwaDdAvgxfI4tBA-5wn_0B1Bog19cUgJYyuo/export?format=csv&gid=2037627206",
   "Zona 2": "https://docs.google.com/spreadsheets/d/1_uR77zitjM6EpbPlmhg92VaNteJuYb28hQkDKbWX2V4/export?format=csv&gid=1607259408",
@@ -63,7 +78,7 @@ const URLS_ZONAS = {
   "Zona 5": "https://docs.google.com/spreadsheets/d/1gaPIk0bPccxj1Wi853iEzvPN3OhE92L1cHgMYJYgztI/export?format=csv&gid=1465503285"
 };
 
-// 📊 PLIEGO
+// PLIEGO
 const pliego = {
   "Zona 1": 2590,
   "Zona 2": 15246,
@@ -75,19 +90,12 @@ const pliego = {
 let datosGlobal = [];
 let mesSeleccionado = null;
 let chart = null;
+let paginaActual = 1;
+const POR_PAGINA = 100;
 
-// 🧠 meses
-const meses = {
-  "ENERO":0,"FEBRERO":1,"MARZO":2,"ABRIL":3,"MAYO":4,"JUNIO":5,
-  "JULIO":6,"AGOSTO":7,"SEPTIEMBRE":8,"OCTUBRE":9,"NOVIEMBRE":10,"DICIEMBRE":11
-};
-
-const mesesCorto = ["ENE","FEB","MAR","ABR","MAY","JUN","JUL","AGO","SEP","OCT","NOV","DIC"];
-
-// 🔧 utils
+// UTILS
 function limpiarTexto(txt) {
-  if (!txt) return "";
-  return txt.toString().trim().toUpperCase()
+  return (txt || "").toString().trim().toUpperCase()
     .normalize("NFD").replace(/[\u0300-\u036f]/g, "");
 }
 
@@ -97,272 +105,219 @@ function getColumna(row, nombre) {
 }
 
 function parseNumero(valor) {
-  if (!valor) return 0;
-  let limpio = valor.toString().replace(/\./g, "").replace(",", ".");
+  let limpio = (valor || "").toString().replace(/\./g, "").replace(",", ".");
   return parseFloat(limpio) || 0;
 }
 
-function parseFecha(fechaStr) {
-  if (!fechaStr) return null;
-  let partes = fechaStr.split(" ")[0].split("/");
-  if (partes.length !== 3) return null;
-  return new Date(partes[2], partes[1]-1, partes[0]);
+function parseFecha(f) {
+  if (!f) return null;
+  let p = f.split(" ")[0].split("/");
+  return new Date(p[2], p[1]-1, p[0]);
 }
 
+// PARSE MES
 function parseMes(texto) {
+  const meses = ["ENERO","FEBRERO","MARZO","ABRIL","MAYO","JUNIO","JULIO","AGOSTO","SEPTIEMBRE","OCTUBRE","NOVIEMBRE","DICIEMBRE"];
+  const corto = ["ENE","FEB","MAR","ABR","MAY","JUN","JUL","AGO","SEP","OCT","NOV","DIC"];
+
   let t = limpiarTexto(texto);
-  let mesNombre = Object.keys(meses).find(m => t.includes(m));
-  let yearMatch = t.match(/\d{4}/);
+  let mesIndex = meses.findIndex(m => t.includes(m));
+  let year = (t.match(/\d{4}/) || [])[0];
 
-  if (!mesNombre || !yearMatch) return null;
+  if (mesIndex < 0 || !year) return null;
 
-  let fecha = new Date(yearMatch[0], meses[mesNombre], 1);
-
+  let fecha = new Date(year, mesIndex, 1);
   return {
     key: fecha.getTime(),
-    label: mesesCorto[fecha.getMonth()] + "-" + fecha.getFullYear().toString().slice(-2)
+    label: corto[mesIndex] + "-" + year.slice(2)
   };
 }
 
-// 📥 cargar datos
+// CARGA
 async function cargarDatos() {
 
-  let promesas = Object.entries(URLS_ZONAS).map(([zona, url]) => {
-    return new Promise(resolve => {
-
+  let promesas = Object.entries(URLS_ZONAS).map(([zona, url]) =>
+    new Promise(resolve => {
       Papa.parse(url, {
         download: true,
         header: true,
         skipEmptyLines: true,
-        complete: function(results) {
-
-          let datos = results.data.map(d => {
-
-            let mes = parseMes(getColumna(d, "Certificado MES"));
-
+        complete: r => {
+          resolve(r.data.map(d => {
+            let mes = parseMes(getColumna(d,"Certificado MES"));
             return {
               Zona: zona,
               mesKey: mes?.key,
               mesLabel: mes?.label,
-              estado: getColumna(d, "Aprobación"),
-              longitud: getColumna(d, "Longitud"),
-              fecha: getColumna(d, "Marca temporal"),
-
-              comuna: getColumna(d, "Comuna"),
-              calle: getColumna(d, "Calle de traza"),
-              inicio: getColumna(d, "Intersección Inicio"),
-              fin: getColumna(d, "Intersección Fin"),
-              diametro: getColumna(d, "Diámetro"),
-              foto1: getColumna(d, "Foto Bajada I (Inicio)"),
-              foto2: getColumna(d, "Foto Bajada II (Fin)"),
-              foto3: getColumna(d, "Foto BR")
+              estado: getColumna(d,"Aprobación"),
+              longitud: getColumna(d,"Longitud"),
+              fecha: getColumna(d,"Marca temporal"),
+              comuna: getColumna(d,"Comuna"),
+              calle: getColumna(d,"Calle de traza"),
+              inicio: getColumna(d,"Intersección Inicio"),
+              fin: getColumna(d,"Intersección Fin"),
+              diametro: getColumna(d,"Diámetro"),
+              foto1: getColumna(d,"Foto Bajada I (Inicio)"),
+              foto2: getColumna(d,"Foto Bajada II (Fin)"),
+              foto3: getColumna(d,"Foto BR")
             };
-
-          });
-
-          resolve(datos);
+          }));
         }
       });
+    })
+  );
 
-    });
-  });
-
-  let resultados = await Promise.all(promesas);
-  datosGlobal = resultados.flat().filter(d => d.mesKey);
+  datosGlobal = (await Promise.all(promesas)).flat().filter(d => d.mesKey);
 
   document.getElementById("loading").style.display = "none";
 
   crearBotones();
 }
 
-// 🔘 botones
+// BOTONES
 function crearBotones() {
 
-  const cont = document.getElementById("botonesMes");
+  let meses = [...new Map(datosGlobal.map(d => [d.mesKey,d])).values()]
+    .sort((a,b)=>a.mesKey-b.mesKey)
+    .filter(m => m.mesLabel !== "JUL-25" && m.mesLabel !== "AGO-25");
+
+  let cont = document.getElementById("botonesMes");
   cont.innerHTML = "";
 
-  let mesesUnicos = [...new Map(
-    datosGlobal.map(d => [d.mesKey, d])
-  ).values()]
-  .sort((a,b) => a.mesKey - b.mesKey)
-  .filter(m => m.mesLabel !== "JUL-25" && m.mesLabel !== "AGO-25");
-
-  mesesUnicos.forEach(m => {
-    let btn = document.createElement("button");
-    btn.innerText = m.mesLabel;
-
-    btn.onclick = () => {
-      mesSeleccionado = m.mesKey;
-      calcular();
-    };
-
-    cont.appendChild(btn);
+  meses.forEach(m => {
+    let b = document.createElement("button");
+    b.innerText = m.mesLabel;
+    b.onclick = () => { mesSeleccionado = m.mesKey; paginaActual=1; calcular(); };
+    cont.appendChild(b);
   });
 }
 
-// 🧠 calcular
+// CALCULAR
 function calcular() {
 
   let filtrados = datosGlobal.filter(d => d.mesKey === mesSeleccionado);
 
-  let resultado = {};
+  let res = {};
+  Object.keys(pliego).forEach(z => res[z]={longitud:0,rechazados:0,revision:0,ultimaFecha:null});
 
-  Object.keys(pliego).forEach(z => {
-    resultado[z] = { longitud:0, rechazados:0, revision:0, ultimaFecha:null };
+  filtrados.forEach(d=>{
+    let z=d.Zona, e=limpiarTexto(d.estado), l=parseNumero(d.longitud), f=parseFecha(d.fecha);
+    if(!e) return;
+
+    if(e==="APROBADO"||e.includes("50")){
+      let fac=e.includes("50")?0.5:1;
+      res[z].longitud+=l*fac;
+      if(f && (!res[z].ultimaFecha || f>res[z].ultimaFecha)) res[z].ultimaFecha=f;
+    }
+    if(e.includes("RECHAZ")) res[z].rechazados+=l;
+    if(e.includes("REVISION")) res[z].revision+=l;
   });
 
-  filtrados.forEach(d => {
-
-    let zona = d.Zona;
-    let estado = limpiarTexto(d.estado);
-    let longitud = parseNumero(d.longitud);
-    let fecha = parseFecha(d.fecha);
-
-    if (!estado) return;
-
-    if (estado === "APROBADO" || estado.includes("50")) {
-      let factor = estado.includes("50") ? 0.5 : 1;
-      resultado[zona].longitud += longitud * factor;
-
-      if (fecha && (!resultado[zona].ultimaFecha || fecha > resultado[zona].ultimaFecha)) {
-        resultado[zona].ultimaFecha = fecha;
-      }
-    }
-
-    if (estado.includes("RECHAZ")) {
-      resultado[zona].rechazados += longitud;
-    }
-
-    if (estado.includes("REVISION")) {
-      resultado[zona].revision += longitud;
-    }
-
-  });
-
-  renderTabla(resultado);
-  renderGrafico(resultado);
+  renderTabla(res);
+  renderGrafico(res);
   renderDetalle(filtrados);
 }
 
-// 📊 tabla resumen
-function renderTabla(data) {
+// TABLA RESUMEN
+function renderTabla(data){
+  let html=`<table><tr>
+  <th>Zona</th><th>Aprobado</th><th>%</th><th>Faltantes</th>
+  <th>Última</th><th>Rechazado</th><th>Revisión</th></tr>`;
 
-  let html = `<table>
-    <tr>
-      <th>Zona</th>
-      <th>Longitud Aprobada</th>
-      <th>% Pliego</th>
-      <th>FALTANTES</th>
-      <th>Última Aprobación</th>
-      <th>Rechazado</th>
-      <th>En Revisión</th>
-    </tr>`;
+  Object.keys(data).forEach(z=>{
+    let d=data[z];
+    let p=((d.longitud/pliego[z])*100||0).toFixed(1);
+    let falt=pliego[z]-d.longitud;
 
-  Object.keys(data).forEach(z => {
-    let d = data[z];
-    let porcentaje = ((d.longitud / pliego[z]) * 100 || 0).toFixed(1);
-    let faltante = pliego[z] - d.longitud;
-
-    html += `<tr>
-      <td>${z}</td>
-      <td>${d.longitud.toFixed(0)}</td>
-      <td>${porcentaje}%</td>
-      <td class="${faltante > 0 ? 'faltante' : ''}">${faltante.toFixed(0)}</td>
-      <td>${d.ultimaFecha ? d.ultimaFecha.toLocaleDateString() : "-"}</td>
-      <td>${d.rechazados.toFixed(0)}</td>
-      <td>${d.revision.toFixed(0)}</td>
+    html+=`<tr>
+    <td>${z}</td>
+    <td>${d.longitud.toFixed(0)}</td>
+    <td>${p}%</td>
+    <td class="${falt>0?'faltante':''}">${falt.toFixed(0)}</td>
+    <td>${d.ultimaFecha?d.ultimaFecha.toLocaleDateString():"-"}</td>
+    <td>${d.rechazados.toFixed(0)}</td>
+    <td>${d.revision.toFixed(0)}</td>
     </tr>`;
   });
 
-  html += `</table>`;
-  document.getElementById("tablaResumen").innerHTML = html;
+  html+="</table>";
+  document.getElementById("tablaResumen").innerHTML=html;
 }
 
-// 📈 gráfico (igual al estable anterior)
-function renderGrafico(data) {
+// GRAFICO
+function renderGrafico(data){
+  let ctx=document.getElementById("graficoZonas").getContext("2d");
 
-  const canvas = document.getElementById("graficoZonas");
-  const ctx = canvas.getContext("2d");
+  if(chart) chart.destroy();
 
-  let zonas = Object.keys(data);
-  let porcentajes = zonas.map(z => (data[z].longitud / pliego[z]) * 100 || 0);
+  let zonas=Object.keys(data);
+  let vals=zonas.map(z=>(data[z].longitud/pliego[z])*100||0);
 
-  if (chart) chart.destroy();
-  ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-  chart = new Chart(ctx, {
-    type: 'bar',
-    data: {
-      labels: zonas,
-      datasets: [
-        {
-          data: porcentajes,
-          backgroundColor: ['#FFD700','#007BFF','#FF69B4','#28A745','#FF8C00']
-        },
-        {
-          type: 'line',
-          data: zonas.map(() => 100),
-          borderDash: [5,5],
-          borderColor: '#000'
-        }
+  chart=new Chart(ctx,{
+    type:"bar",
+    data:{
+      labels:zonas,
+      datasets:[
+        {data:vals,backgroundColor:['#FFD700','#007BFF','#FF69B4','#28A745','#FF8C00']},
+        {type:'line',data:zonas.map(()=>100),borderDash:[5,5],borderColor:'#000'}
       ]
     },
-    options: {
-      indexAxis: 'y',
-      animation: false,
-      scales: { x: { beginAtZero: true } }
-    }
+    options:{indexAxis:'y',animation:false}
   });
 }
 
-// 📋 detalle
-function renderDetalle(filtrados) {
+// DETALLE
+function renderDetalle(filtrados){
 
-  const MAX = 150;
-  let datos = filtrados.slice(0, MAX);
+  let zona=document.getElementById("filtroZona").value;
+  let txt=limpiarTexto(document.getElementById("buscadorCalle").value);
 
-  let html = `<table>
-    <tr>
-      <th>Zona</th>
-      <th>Comuna</th>
-      <th>Calle</th>
-      <th>Inicio</th>
-      <th>Fin</th>
-      <th>Diámetro</th>
-      <th>Longitud</th>
-      <th>Aprobación</th>
-      <th>Fotos</th>
-    </tr>`;
+  let datos=filtrados.filter(d=>{
+    return (zona==="TODAS"||d.Zona===zona) &&
+           (!txt || limpiarTexto(d.calle).includes(txt));
+  });
 
-  datos.forEach(d => {
+  let totalPag=Math.ceil(datos.length/POR_PAGINA);
+  let inicio=(paginaActual-1)*POR_PAGINA;
+  let page=datos.slice(inicio,inicio+POR_PAGINA);
 
-    html += `<tr>
-      <td>${d.Zona}</td>
-      <td>${d.comuna || "-"}</td>
-      <td>${d.calle || "-"}</td>
-      <td>${d.inicio || "-"}</td>
-      <td>${d.fin || "-"}</td>
-      <td>${d.diametro || "-"}</td>
-      <td>${parseNumero(d.longitud).toFixed(0)}</td>
-      <td>${d.estado || "-"}</td>
-      <td>
-        ${d.foto1 ? `<a href="${d.foto1}" target="_blank">I</a>` : ""}
-        ${d.foto2 ? `<a href="${d.foto2}" target="_blank">II</a>` : ""}
-        ${d.foto3 ? `<a href="${d.foto3}" target="_blank">BR</a>` : ""}
-      </td>
+  let html=`<table><tr>
+  <th>Zona</th><th>Comuna</th><th>Calle</th>
+  <th>Inicio</th><th>Fin</th><th>Diámetro</th>
+  <th>Longitud</th><th>Aprobación</th><th>Fotos</th></tr>`;
+
+  page.forEach(d=>{
+    html+=`<tr>
+    <td>${d.Zona}</td>
+    <td>${d.comuna||"-"}</td>
+    <td>${d.calle||"-"}</td>
+    <td>${d.inicio||"-"}</td>
+    <td>${d.fin||"-"}</td>
+    <td>${d.diametro||"-"}</td>
+    <td>${parseNumero(d.longitud).toFixed(0)}</td>
+    <td>${d.estado||"-"}</td>
+    <td>
+      ${d.foto1?`<a href="${d.foto1}" target="_blank">I</a>`:""}
+      ${d.foto2?`<a href="${d.foto2}" target="_blank">II</a>`:""}
+      ${d.foto3?`<a href="${d.foto3}" target="_blank">BR</a>`:""}
+    </td>
     </tr>`;
   });
 
-  html += `</table>`;
+  html+="</table>";
+  document.getElementById("tablaDetalle").innerHTML=html;
 
-  if (filtrados.length > MAX) {
-    html += `<p>Mostrando ${MAX} de ${filtrados.length} registros</p>`;
-  }
-
-  document.getElementById("tablaDetalle").innerHTML = html;
+  document.getElementById("paginado").innerHTML=`
+  <button onclick="paginaActual--;calcular()" ${paginaActual===1?"disabled":""}>◀</button>
+  Página ${paginaActual} de ${totalPag||1}
+  <button onclick="paginaActual++;calcular()" ${paginaActual>=totalPag?"disabled":""}>▶</button>`;
 }
 
-// 🚀 iniciar
+// EVENTOS
+document.addEventListener("input",()=>{paginaActual=1;calcular();});
+document.addEventListener("change",()=>{paginaActual=1;calcular();});
+
+// INIT
 cargarDatos();
 
 </script>
