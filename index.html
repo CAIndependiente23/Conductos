@@ -40,7 +40,18 @@ th { background: #eee; }
 
 <div id="loading">Cargando datos...</div>
 
+<!-- 🔍 BUSCADOR GLOBAL -->
+<div style="margin-bottom:10px;">
+  <input 
+    id="buscadorGlobal"
+    type="text"
+    placeholder="Buscar en todos los meses (calle, comuna, intersección...)"
+    style="width:60%; padding:8px;"
+  />
+</div>
+
 <div class="botones" id="botonesMes"></div>
+
 <div id="tablaResumen"></div>
 
 <div style="width: 80%; margin: 40px auto;">
@@ -93,7 +104,7 @@ let chart = null;
 let paginaActual = 1;
 const POR_PAGINA = 100;
 
-// UTILS
+// 🔧 UTILS
 function limpiarTexto(txt) {
   return (txt || "").toString().trim().toUpperCase()
     .normalize("NFD").replace(/[\u0300-\u036f]/g, "");
@@ -115,7 +126,7 @@ function parseFecha(f) {
   return new Date(p[2], p[1]-1, p[0]);
 }
 
-// MES
+// 📅 MES
 function parseMes(texto) {
   const meses = ["ENERO","FEBRERO","MARZO","ABRIL","MAYO","JUNIO","JULIO","AGOSTO","SEPTIEMBRE","OCTUBRE","NOVIEMBRE","DICIEMBRE"];
   const corto = ["ENE","FEB","MAR","ABR","MAY","JUN","JUL","AGO","SEP","OCT","NOV","DIC"];
@@ -127,13 +138,14 @@ function parseMes(texto) {
   if (i < 0 || !y) return null;
 
   let fecha = new Date(y, i, 1);
+
   return {
     key: fecha.getTime(),
     label: corto[i] + "-" + y.slice(2)
   };
 }
 
-// CARGA
+// 📥 CARGA
 async function cargarDatos() {
 
   let promesas = Object.entries(URLS_ZONAS).map(([zona, url]) =>
@@ -144,6 +156,7 @@ async function cargarDatos() {
         skipEmptyLines: true,
         complete: r => {
           resolve(r.data.map(d => {
+
             let mes = parseMes(getColumna(d,"Certificado MES"));
 
             return {
@@ -175,44 +188,50 @@ async function cargarDatos() {
   crearBotones();
 }
 
-// BOTONES
+// 🔘 BOTONES MES
 function crearBotones() {
 
   const cont = document.getElementById("botonesMes");
   cont.innerHTML = "";
 
-  // 🔥 GENERAL
-  let btnAll = document.createElement("button");
-  btnAll.innerText = "GENERAL";
-  btnAll.onclick = () => {
-    mesSeleccionado = "GENERAL";
-    paginaActual = 1;
-    calcular();
-  };
-  cont.appendChild(btnAll);
-
-  let meses = [...new Map(datosGlobal.map(d => [d.mesKey,d])).values()]
+  let mesesUnicos = [...new Map(datosGlobal.map(d => [d.mesKey,d])).values()]
     .sort((a,b)=>a.mesKey-b.mesKey)
     .filter(m => m.label !== "JUL-25" && m.label !== "AGO-25");
 
-  meses.forEach(m => {
-    let b = document.createElement("button");
-    b.innerText = m.label;
-    b.onclick = () => {
+  mesesUnicos.forEach(m => {
+
+    let btn = document.createElement("button");
+    btn.innerText = m.label;
+
+    btn.onclick = () => {
       mesSeleccionado = m.key;
       paginaActual = 1;
       calcular();
     };
-    cont.appendChild(b);
+
+    cont.appendChild(btn);
   });
 }
 
-// CALCULAR
+// 🧠 CALCULAR
 function calcular() {
 
-  let filtrados = (mesSeleccionado === "GENERAL" || !mesSeleccionado)
-    ? datosGlobal
-    : datosGlobal.filter(d => d.mesKey === mesSeleccionado);
+  let texto = limpiarTexto(document.getElementById("buscadorGlobal")?.value || "");
+
+  let base = datosGlobal.filter(d => d.mesKey === mesSeleccionado);
+
+  let filtrados = base.filter(d => {
+
+    if (!texto) return true;
+
+    return (
+      limpiarTexto(d.calle).includes(texto) ||
+      limpiarTexto(d.inicio).includes(texto) ||
+      limpiarTexto(d.fin).includes(texto) ||
+      limpiarTexto(d.comuna).includes(texto) ||
+      limpiarTexto(d.Zona).includes(texto)
+    );
+  });
 
   let res = {};
   Object.keys(pliego).forEach(z => res[z]={longitud:0,rechazados:0,revision:0,ultimaFecha:null});
@@ -235,8 +254,9 @@ function calcular() {
   renderDetalle(filtrados);
 }
 
-// TABLA
+// 📊 TABLA
 function renderTabla(data){
+
   let html=`<table><tr>
   <th>Zona</th><th>Aprobado</th><th>%</th><th>Faltantes</th>
   <th>Última</th><th>Rechazado</th><th>Revisión</th></tr>`;
@@ -261,8 +281,9 @@ function renderTabla(data){
   document.getElementById("tablaResumen").innerHTML=html;
 }
 
-// GRAFICO
+// 📊 GRÁFICO
 function renderGrafico(data){
+
   let ctx=document.getElementById("graficoZonas").getContext("2d");
 
   if(chart) chart.destroy();
@@ -275,15 +296,26 @@ function renderGrafico(data){
     data:{
       labels:zonas,
       datasets:[
-        {data:vals,backgroundColor:['#FFD700','#007BFF','#FF69B4','#28A745','#FF8C00']},
-        {type:'line',data:zonas.map(()=>100),borderDash:[5,5],borderColor:'#000'}
+        {
+          data:vals,
+          backgroundColor:['#FFD700','#007BFF','#FF69B4','#28A745','#FF8C00']
+        },
+        {
+          type:'line',
+          data:zonas.map(()=>100),
+          borderDash:[5,5],
+          borderColor:'#000'
+        }
       ]
     },
-    options:{indexAxis:'y',animation:false}
+    options:{
+      indexAxis:'y',
+      animation:false
+    }
   });
 }
 
-// DETALLE
+// 📋 DETALLE
 function renderDetalle(filtrados){
 
   let zona=document.getElementById("filtroZona").value;
@@ -332,7 +364,7 @@ function renderDetalle(filtrados){
   `;
 }
 
-// EVENTS
+// 🔁 EVENTOS
 document.addEventListener("input",()=>{paginaActual=1;calcular();});
 document.addEventListener("change",()=>{paginaActual=1;calcular();});
 
