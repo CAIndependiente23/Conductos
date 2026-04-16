@@ -9,10 +9,18 @@
 <style>
 body { font-family: Arial; margin: 20px; }
 
+h2 { margin-bottom: 10px; }
+
 .botones button {
   margin: 5px;
   padding: 6px 10px;
   cursor: pointer;
+  border: 1px solid #ccc;
+  background: #f5f5f5;
+}
+
+.botones button:hover {
+  background: #ddd;
 }
 
 table {
@@ -35,13 +43,15 @@ th { background: #eee; }
 
 <h2>Dashboard por Zona</h2>
 
-<div id="botonesMes"></div>
+<div class="botones" id="botonesMes"></div>
 <div id="tablaResumen"></div>
 
 <script>
 
+// 🔗 CSV GOOGLE SHEETS
 const URL_CSV = "https://docs.google.com/spreadsheets/d/1OsRXS125K9GfH24Qa6nriI4-MUeQB_OWWhJBdi1arw0/export?format=csv&gid=0";
 
+// 📊 PLIEGO
 const pliego = {
   "Zona 1": 2590,
   "Zona 2": 15246,
@@ -53,14 +63,29 @@ const pliego = {
 let datosGlobal = [];
 let certificadoSeleccionado = null;
 
-// 🔧 normalizar texto
+// 🔧 Normalizar texto
 function limpiarTexto(txt) {
   if (!txt) return "";
   return txt.toString().trim().toUpperCase()
     .normalize("NFD").replace(/[\u0300-\u036f]/g, "");
 }
 
-// 📅 parse fecha
+// 🔧 Convertir zona 1–5 → Zona X
+function normalizarZona(z) {
+  if (!z) return null;
+
+  let num = z.toString().replace(/\D/g, "");
+
+  if (num === "1") return "Zona 1";
+  if (num === "2") return "Zona 2";
+  if (num === "3") return "Zona 3";
+  if (num === "4") return "Zona 4";
+  if (num === "5") return "Zona 5";
+
+  return null;
+}
+
+// 📅 Parse fecha argentina
 function parseFecha(fechaStr) {
   if (!fechaStr) return null;
 
@@ -70,7 +95,7 @@ function parseFecha(fechaStr) {
   return new Date(partes[2], partes[1]-1, partes[0]);
 }
 
-// 📥 cargar CSV
+// 📥 Cargar CSV
 Papa.parse(URL_CSV, {
   download: true,
   header: true,
@@ -80,7 +105,7 @@ Papa.parse(URL_CSV, {
   }
 });
 
-// 🔘 BOTONES
+// 🔘 Botonera por Certificado MES
 function crearBotones() {
   const cont = document.getElementById("botonesMes");
 
@@ -101,7 +126,7 @@ function crearBotones() {
   });
 }
 
-// 🧠 CALCULAR
+// 🧠 Calcular métricas
 function calcular() {
 
   let filtrados = datosGlobal.filter(d => d["Certificado MES"] === certificadoSeleccionado);
@@ -119,12 +144,12 @@ function calcular() {
 
   filtrados.forEach(d => {
 
-    let zona = d["Zona"];
+    let zona = normalizarZona(d["Zona"]);
     let estado = limpiarTexto(d["Aprobación"]);
     let longitud = parseFloat(d["Longitud"]) || 0;
     let fecha = parseFecha(d["Marca temporal"]);
 
-    if (!resultado[zona]) return;
+    if (!zona) return;
 
     if (estado === "APROBADO") {
       resultado[zona].longitud += longitud;
@@ -134,17 +159,23 @@ function calcular() {
       }
     }
 
-    if (estado === "RECHAZADO") resultado[zona].rechazados++;
-    if (estado === "EN REVISION") resultado[zona].revision++;
+    if (estado.includes("RECHAZ")) {
+      resultado[zona].rechazados++;
+    }
+
+    if (estado.includes("REVISION")) {
+      resultado[zona].revision++;
+    }
   });
 
   renderTabla(resultado);
 }
 
-// 📊 TABLA
+// 📊 Render tabla
 function renderTabla(data) {
 
-  let html = `<table>
+  let html = `
+  <table>
     <tr>
       <th>Zona</th>
       <th>Longitud Aprobada</th>
@@ -152,20 +183,26 @@ function renderTabla(data) {
       <th>Última Aprobación</th>
       <th>Rechazados</th>
       <th>En Revisión</th>
-    </tr>`;
+    </tr>
+  `;
 
-  Object.keys(data).forEach(z => {
-    let d = data[z];
-    let porcentaje = ((d.longitud / pliego[z]) * 100 || 0).toFixed(1);
+  Object.keys(data).forEach(zona => {
+    let d = data[zona];
 
-    html += `<tr>
-      <td>${z}</td>
-      <td>${d.longitud.toFixed(0)}</td>
-      <td>${porcentaje}%</td>
-      <td>${d.ultimaFecha ? d.ultimaFecha.toLocaleDateString() : "-"}</td>
-      <td>${d.rechazados}</td>
-      <td>${d.revision}</td>
-    </tr>`;
+    let porcentaje = pliego[zona]
+      ? ((d.longitud / pliego[zona]) * 100).toFixed(1)
+      : 0;
+
+    html += `
+      <tr>
+        <td>${zona}</td>
+        <td>${d.longitud.toFixed(0)}</td>
+        <td>${porcentaje}%</td>
+        <td>${d.ultimaFecha ? d.ultimaFecha.toLocaleDateString() : "-"}</td>
+        <td>${d.rechazados}</td>
+        <td>${d.revision}</td>
+      </tr>
+    `;
   });
 
   html += `</table>`;
