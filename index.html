@@ -106,11 +106,16 @@ let modoBuscador = false;
 let chart = null;
 let map;
 let markers = [];
+let pagina = 1;
+const POR_PAGINA = 100;
 
 // ---------------- MAP ----------------
 function initMap(){
   map = L.map('map').setView([-34.6,-58.38], 11);
-  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
+
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{
+    attribution:'OSM'
+  }).addTo(map);
 }
 
 // ---------------- UTILS ----------------
@@ -138,7 +143,12 @@ function parseMes(t){
   let y=(t.match(/\d{4}/)||[])[0];
   if(i<0||!y)return null;
 
-  return {key:new Date(y,i,1).getTime(),label:c[i]+"-"+y.slice(2)};
+  let label=c[i]+"-"+y.slice(2);
+
+  // ❌ eliminar meses de prueba
+  if(label==="JUL-25" || label==="AGO-25") return null;
+
+  return {key:new Date(y,i,1).getTime(),label};
 }
 
 // ---------------- LOAD COORDS ----------------
@@ -150,7 +160,8 @@ async function loadCoords(){
       complete:r=>{
         r.data.forEach(d=>{
           let id=get(d,"Marca temporal");
-          let c=get(d,"C1"); // "lat,lon"
+          let c=get(d,"C1");
+
           if(id && c){
             let [lat,lon]=c.split(",");
             coordsMap[id]={
@@ -220,7 +231,12 @@ function crearBotones(){
 function activarBuscador(){
   modoBuscador=true;
   mesSeleccionado=null;
-  calcular();
+
+  document.getElementById("tablaResumen").innerHTML="";
+  if(chart) chart.destroy();
+
+  renderDetalle(datosGlobal);
+  renderMap(datosGlobal);
 }
 
 // ---------------- CALCULAR ----------------
@@ -250,6 +266,7 @@ function calcular(){
   renderTabla(res);
   renderGrafico(res);
   renderMap(data);
+  renderDetalle(data);
 }
 
 // ---------------- TABLA ----------------
@@ -278,7 +295,7 @@ function renderTabla(data){
   document.getElementById("tablaResumen").innerHTML=html;
 }
 
-// ---------------- GRAFICO ----------------
+// ---------------- GRAFICO LIMPIO ----------------
 function renderGrafico(data){
 
   let ctx=document.getElementById("graficoZonas").getContext("2d");
@@ -301,9 +318,15 @@ function renderGrafico(data){
           type:'line',
           data:zonas.map(()=>100),
           borderDash:[5,5],
-          borderColor:'#000'
+          borderColor:'#999',
+          pointRadius:0
         }
       ]
+    },
+    options:{
+      plugins:{legend:{display:false}},
+      indexAxis:'y',
+      scales:{x:{max:120}}
     }
   });
 }
@@ -331,6 +354,36 @@ function renderMap(data){
 
     markers.push(m);
   });
+}
+
+// ---------------- DETALLE ----------------
+function renderDetalle(data){
+
+  let zona=document.getElementById("filtroZona")?.value || "TODAS";
+  let txt=limpiar(document.getElementById("buscadorCalle")?.value || "");
+
+  let filtrado=data.filter(d=>{
+    return (zona==="TODAS"||d.Zona===zona) &&
+           (!txt||limpiar(d.calle).includes(txt));
+  });
+
+  let inicio=(pagina-1)*POR_PAGINA;
+  let page=filtrado.slice(inicio,inicio+POR_PAGINA);
+
+  let html=`<table><tr>
+  <th>Zona</th><th>Calle</th><th>Estado</th></tr>`;
+
+  page.forEach(d=>{
+    html+=`<tr>
+    <td>${d.Zona}</td>
+    <td>${d.calle||""}</td>
+    <td>${d.estado||""}</td>
+    </tr>`;
+  });
+
+  html+="</table>";
+
+  document.getElementById("tablaDetalle").innerHTML=html;
 }
 
 // ---------------- START ----------------
