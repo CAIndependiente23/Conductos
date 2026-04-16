@@ -53,7 +53,7 @@ const pliego = {
 let datosGlobal = [];
 let certificadoSeleccionado = null;
 
-// 🔧 normalizar texto
+// 🔧 limpiar texto
 function limpiarTexto(txt) {
   if (!txt) return "";
   return txt.toString().trim().toUpperCase()
@@ -63,19 +63,12 @@ function limpiarTexto(txt) {
 // 🔧 zona
 function normalizarZona(z) {
   if (!z) return null;
-
   let num = z.toString().replace(/\D/g, "");
-
-  if (num === "1") return "Zona 1";
-  if (num === "2") return "Zona 2";
-  if (num === "3") return "Zona 3";
-  if (num === "4") return "Zona 4";
-  if (num === "5") return "Zona 5";
-
+  if (["1","2","3","4","5"].includes(num)) return "Zona " + num;
   return null;
 }
 
-// 📅 fecha
+// 📅 fecha (solo para última actualización)
 function parseFecha(fechaStr) {
   if (!fechaStr) return null;
 
@@ -85,12 +78,7 @@ function parseFecha(fechaStr) {
   return new Date(partes[2], partes[1]-1, partes[0]);
 }
 
-// 🔽 meses válidos (desde septiembre)
-const mesesValidos = [
-  "SEPTIEMBRE","OCTUBRE","NOVIEMBRE","DICIEMBRE"
-];
-
-// 📥 cargar CSV
+// 📥 cargar
 Papa.parse(URL_CSV, {
   download: true,
   header: true,
@@ -100,7 +88,7 @@ Papa.parse(URL_CSV, {
   }
 });
 
-// 🔘 BOTONES
+// 🔘 BOTONES (todos excepto julio/agosto)
 function crearBotones() {
   const cont = document.getElementById("botonesMes");
 
@@ -108,7 +96,10 @@ function crearBotones() {
     datosGlobal
       .map(d => d["Certificado MES"])
       .filter(Boolean)
-      .filter(m => mesesValidos.includes(limpiarTexto(m)))
+      .filter(m => {
+        let txt = limpiarTexto(m);
+        return !txt.includes("JULIO") && !txt.includes("AGOSTO");
+      })
   )];
 
   certificados.forEach(c => {
@@ -124,10 +115,12 @@ function crearBotones() {
   });
 }
 
-// 🧠 CALCULAR
+// 🧠 CALCULAR (CORREGIDO)
 function calcular() {
 
-  let filtrados = datosGlobal.filter(d => d["Certificado MES"] === certificadoSeleccionado);
+  let filtrados = datosGlobal.filter(d => 
+    limpiarTexto(d["Certificado MES"]) === limpiarTexto(certificadoSeleccionado)
+  );
 
   let resultado = {};
 
@@ -152,24 +145,25 @@ function calcular() {
     if (estado === "APROBADO") {
       resultado[zona].longitud += longitud;
 
-      if (!resultado[zona].ultimaFecha || fecha > resultado[zona].ultimaFecha) {
+      if (fecha && (!resultado[zona].ultimaFecha || fecha > resultado[zona].ultimaFecha)) {
         resultado[zona].ultimaFecha = fecha;
       }
     }
 
     if (estado.includes("RECHAZ")) {
-      resultado[zona].rechazados += longitud; // 🔥 CAMBIO
+      resultado[zona].rechazados += longitud;
     }
 
     if (estado.includes("REVISION")) {
-      resultado[zona].revision += longitud; // 🔥 CAMBIO
+      resultado[zona].revision += longitud;
     }
+
   });
 
   renderTabla(resultado);
 }
 
-// 📊 TABLA
+// 📊 tabla
 function renderTabla(data) {
 
   let html = `<table>
