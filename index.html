@@ -34,10 +34,7 @@ th { background: #eee; }
 
 .faltante { background-color: #ffcccc; }
 
-#map {
-  height: 400px;
-  margin-top: 20px;
-}
+#map { height: 420px; margin-top: 20px; }
 </style>
 </head>
 
@@ -49,13 +46,15 @@ th { background: #eee; }
 
 <div class="botones" id="botonesMes"></div>
 
+<button onclick="activarBuscador()">🔎 BUSCADOR GLOBAL</button>
+
 <div id="tablaResumen"></div>
 
 <div style="width: 80%; margin: 20px auto;">
   <canvas id="graficoZonas"></canvas>
 </div>
 
-<h3>Mapa de Conductos</h3>
+<h3>Mapa GIS</h3>
 <div id="map"></div>
 
 <h3>Detalle de Registros</h3>
@@ -71,8 +70,7 @@ th { background: #eee; }
     <option>Zona 5</option>
   </select>
 
-  <label style="margin-left:20px;">Buscar calle:</label>
-  <input type="text" id="buscadorCalle" placeholder="Ej: Corrientes">
+  <input id="buscadorCalle" placeholder="Buscar calle">
 </div>
 
 <div id="tablaDetalle"></div>
@@ -80,7 +78,7 @@ th { background: #eee; }
 
 <script>
 
-// -------------------- DATA --------------------
+// ---------------- DATA ----------------
 const URLS_ZONAS = {
   "Zona 1": "https://docs.google.com/spreadsheets/d/1HIJJCVYnwaDdAvgxfI4tBA-5wn_0B1Bog19cUgJYyuo/export?format=csv&gid=2037627206",
   "Zona 2": "https://docs.google.com/spreadsheets/d/1_uR77zitjM6EpbPlmhg92VaNteJuYb28hQkDKbWX2V4/export?format=csv&gid=1607259408",
@@ -104,45 +102,46 @@ let datosGlobal = [];
 let coordsMap = {};
 let mesSeleccionado = null;
 let modoBuscador = false;
+
 let chart = null;
 let map;
 let markers = [];
 
-// -------------------- INIT MAP --------------------
+// ---------------- MAP ----------------
 function initMap(){
-  map = L.map('map').setView([-34.6, -58.38], 11);
-
-  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{
-    attribution:'OSM'
-  }).addTo(map);
+  map = L.map('map').setView([-34.6,-58.38], 11);
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
 }
 
-// -------------------- UTILS --------------------
-function limpiarTexto(txt){
-  return (txt||"").toString().trim().toUpperCase()
-    .normalize("NFD").replace(/[\u0300-\u036f]/g,"");
+// ---------------- UTILS ----------------
+function limpiar(t){
+  return (t||"").toString().trim().toUpperCase()
+  .normalize("NFD").replace(/[\u0300-\u036f]/g,"");
 }
 
-function getCol(row,name){
-  let k=Object.keys(row).find(x=>limpiarTexto(x)===limpiarTexto(name));
-  return k?row[k]:null;
+function get(r,n){
+  let k=Object.keys(r).find(x=>limpiar(x)===limpiar(n));
+  return k?r[k]:null;
 }
 
-function parseNum(v){
+function num(v){
   return parseFloat((v||"").toString().replace(".","").replace(",",".")||0);
 }
 
+// ---------------- MES ----------------
 function parseMes(t){
   const m=["ENERO","FEBRERO","MARZO","ABRIL","MAYO","JUNIO","JULIO","AGOSTO","SEPTIEMBRE","OCTUBRE","NOVIEMBRE","DICIEMBRE"];
   const c=["ENE","FEB","MAR","ABR","MAY","JUN","JUL","AGO","SEP","OCT","NOV","DIC"];
-  t=limpiarTexto(t);
+
+  t=limpiar(t);
   let i=m.findIndex(x=>t.includes(x));
   let y=(t.match(/\d{4}/)||[])[0];
   if(i<0||!y)return null;
+
   return {key:new Date(y,i,1).getTime(),label:c[i]+"-"+y.slice(2)};
 }
 
-// -------------------- LOAD COORDS --------------------
+// ---------------- LOAD COORDS ----------------
 async function loadCoords(){
   return new Promise(res=>{
     Papa.parse(URL_COORDS,{
@@ -150,13 +149,13 @@ async function loadCoords(){
       header:true,
       complete:r=>{
         r.data.forEach(d=>{
-          let id=getCol(d,"Marca temporal");
-          let coord=getCol(d,"C1"); // "lat,lon"
-          if(id && coord){
-            let parts=coord.split(",");
-            coordsMap[id.trim()] = {
-              lat: parseFloat(parts[0]),
-              lon: parseFloat(parts[1])
+          let id=get(d,"Marca temporal");
+          let c=get(d,"C1"); // "lat,lon"
+          if(id && c){
+            let [lat,lon]=c.split(",");
+            coordsMap[id]={
+              lat:parseFloat(lat),
+              lon:parseFloat(lon)
             };
           }
         });
@@ -166,32 +165,27 @@ async function loadCoords(){
   });
 }
 
-// -------------------- LOAD DATA --------------------
+// ---------------- LOAD DATA ----------------
 async function loadData(){
 
-  let prom=Object.entries(URLS_ZONAS).map(([zona,url])=>new Promise(res=>{
+  let prom=Object.entries(URLS_ZONAS).map(([z,url])=>new Promise(res=>{
     Papa.parse(url,{
       download:true,
       header:true,
       complete:r=>{
-        res(r.data.map(d=>{
-          let id=getCol(d,"Marca temporal");
-
-          return {
-            id,
-            Zona:zona,
-            mes:parseMes(getCol(d,"Certificado MES")),
-            estado:getCol(d,"Aprobación"),
-            long:parseNum(getCol(d,"Longitud")),
-            calle:getCol(d,"Calle de traza"),
-          };
-        }));
+        res(r.data.map(d=>({
+          id:get(d,"Marca temporal"),
+          Zona:z,
+          mes:parseMes(get(d,"Certificado MES")),
+          estado:get(d,"Aprobación"),
+          long:num(get(d,"Longitud")),
+          calle:get(d,"Calle de traza")
+        })));
       }
     });
   }));
 
-  let all=(await Promise.all(prom)).flat();
-  datosGlobal=all.filter(d=>d.mes);
+  datosGlobal=(await Promise.all(prom)).flat().filter(d=>d.mes);
 
   document.getElementById("loading").style.display="none";
 
@@ -199,33 +193,122 @@ async function loadData(){
   calcular();
 }
 
-// -------------------- BOTONES --------------------
+// ---------------- BOTONES ----------------
 function crearBotones(){
+
   let cont=document.getElementById("botonesMes");
   cont.innerHTML="";
 
   let meses=[...new Map(datosGlobal.map(d=>[d.mes.key,d.mes])).values()]
-    .sort((a,b)=>a.key-b.key);
+  .sort((a,b)=>a.key-b.key);
 
   meses.forEach(m=>{
     let b=document.createElement("button");
     b.innerText=m.label;
-    b.onclick=()=>{mesSeleccionado=m.key;modoBuscador=false;calcular();};
+
+    b.onclick=()=>{
+      modoBuscador=false;
+      mesSeleccionado=m.key;
+      calcular();
+    };
+
     cont.appendChild(b);
   });
 }
 
-// -------------------- CALCULAR --------------------
+// ---------------- BUSCADOR ----------------
+function activarBuscador(){
+  modoBuscador=true;
+  mesSeleccionado=null;
+  calcular();
+}
+
+// ---------------- CALCULAR ----------------
 function calcular(){
 
-  let data=mesSeleccionado
-    ? datosGlobal.filter(d=>d.mes.key===mesSeleccionado)
-    : datosGlobal;
+  let data = (modoBuscador || !mesSeleccionado)
+    ? datosGlobal
+    : datosGlobal.filter(d=>d.mes.key===mesSeleccionado);
 
+  let res={};
+
+  Object.keys(pliego).forEach(z=>{
+    res[z]={longitud:0,rechazados:0,revision:0};
+  });
+
+  data.forEach(d=>{
+    let e=limpiar(d.estado);
+    if(!e) return;
+
+    if(e==="APROBADO"||e.includes("50")){
+      res[d.Zona].longitud+=d.long*(e.includes("50")?0.5:1);
+    }
+    if(e.includes("RECH")) res[d.Zona].rechazados+=d.long;
+    if(e.includes("REV")) res[d.Zona].revision+=d.long;
+  });
+
+  renderTabla(res);
+  renderGrafico(res);
   renderMap(data);
 }
 
-// -------------------- MAP --------------------
+// ---------------- TABLA ----------------
+function renderTabla(data){
+
+  let html=`<table><tr>
+  <th>Zona</th><th>Aprobado</th><th>%</th><th>Faltantes</th>
+  <th>Rech</th><th>Rev</th></tr>`;
+
+  Object.keys(data).forEach(z=>{
+    let d=data[z];
+    let p=(d.longitud/pliego[z]*100||0).toFixed(1);
+    let f=pliego[z]-d.longitud;
+
+    html+=`<tr>
+    <td>${z}</td>
+    <td>${d.longitud.toFixed(0)}</td>
+    <td>${p}%</td>
+    <td class="${f>0?'faltante':''}">${f.toFixed(0)}</td>
+    <td>${d.rechazados.toFixed(0)}</td>
+    <td>${d.revision.toFixed(0)}</td>
+    </tr>`;
+  });
+
+  html+="</table>";
+  document.getElementById("tablaResumen").innerHTML=html;
+}
+
+// ---------------- GRAFICO ----------------
+function renderGrafico(data){
+
+  let ctx=document.getElementById("graficoZonas").getContext("2d");
+
+  if(chart) chart.destroy();
+
+  let zonas=Object.keys(data);
+  let vals=zonas.map(z=>(data[z].longitud/pliego[z]*100||0));
+
+  chart=new Chart(ctx,{
+    type:"bar",
+    data:{
+      labels:zonas,
+      datasets:[
+        {
+          data:vals,
+          backgroundColor:['#FFD700','#007BFF','#FF69B4','#28A745','#FF8C00']
+        },
+        {
+          type:'line',
+          data:zonas.map(()=>100),
+          borderDash:[5,5],
+          borderColor:'#000'
+        }
+      ]
+    }
+  });
+}
+
+// ---------------- MAP ----------------
 function renderMap(data){
 
   markers.forEach(m=>map.removeLayer(m));
@@ -233,28 +316,24 @@ function renderMap(data){
 
   data.forEach(d=>{
     let c=coordsMap[d.id];
-    if(!c)return;
+    if(!c) return;
 
-    let color=
+    let color =
       d.estado.includes("APROBADO")?"green":
       d.estado.includes("RECH")?"red":"orange";
 
-    let marker=L.circleMarker([c.lat,c.lon],{
-      radius:6,
+    let m=L.circleMarker([c.lat,c.lon],{
+      radius:5,
       color
     }).addTo(map);
 
-    marker.bindPopup(`
-      <b>${d.Zona}</b><br>
-      ${d.calle||""}<br>
-      ${d.estado}
-    `);
+    m.bindPopup(`<b>${d.Zona}</b><br>${d.calle||""}<br>${d.estado}`);
 
-    markers.push(marker);
+    markers.push(m);
   });
 }
 
-// -------------------- START --------------------
+// ---------------- START ----------------
 async function start(){
   initMap();
   await loadCoords();
