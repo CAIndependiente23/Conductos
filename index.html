@@ -74,7 +74,6 @@ th { background: #eee; }
 </div>
 
 <div id="tablaDetalle"></div>
-<div id="paginado"></div>
 
 <script>
 
@@ -106,8 +105,6 @@ let modoBuscador = false;
 let chart = null;
 let map;
 let markers = [];
-let pagina = 1;
-const POR_PAGINA = 100;
 
 // ---------------- MAP ----------------
 function initMap(){
@@ -145,13 +142,12 @@ function parseMes(t){
 
   let label=c[i]+"-"+y.slice(2);
 
-  // ❌ eliminar meses de prueba
   if(label==="JUL-25" || label==="AGO-25") return null;
 
   return {key:new Date(y,i,1).getTime(),label};
 }
 
-// ---------------- LOAD COORDS ----------------
+// ---------------- LOAD ----------------
 async function loadCoords(){
   return new Promise(res=>{
     Papa.parse(URL_COORDS,{
@@ -164,10 +160,7 @@ async function loadCoords(){
 
           if(id && c){
             let [lat,lon]=c.split(",");
-            coordsMap[id]={
-              lat:parseFloat(lat),
-              lon:parseFloat(lon)
-            };
+            coordsMap[id]={lat:+lat,lon:+lon};
           }
         });
         res();
@@ -176,7 +169,6 @@ async function loadCoords(){
   });
 }
 
-// ---------------- LOAD DATA ----------------
 async function loadData(){
 
   let prom=Object.entries(URLS_ZONAS).map(([z,url])=>new Promise(res=>{
@@ -190,7 +182,13 @@ async function loadData(){
           mes:parseMes(get(d,"Certificado MES")),
           estado:get(d,"Aprobación"),
           long:num(get(d,"Longitud")),
-          calle:get(d,"Calle de traza")
+          calle:get(d,"Calle de traza"),
+          ini:get(d,"Intersección Inicio"),
+          fin:get(d,"Intersección Fin"),
+          diam:get(d,"Diámetro"),
+          f1:get(d,"Foto Bajada I (Inicio)"),
+          f2:get(d,"Foto Bajada II (Fin)"),
+          f3:get(d,"Foto BR")
         })));
       }
     });
@@ -200,8 +198,7 @@ async function loadData(){
 
   document.getElementById("loading").style.display="none";
 
-  crearBotones();
-  calcular();
+  crearBotones(); // 🔴 FIX: NO calcular aquí
 }
 
 // ---------------- BOTONES ----------------
@@ -242,7 +239,7 @@ function activarBuscador(){
 // ---------------- CALCULAR ----------------
 function calcular(){
 
-  let data = (modoBuscador || !mesSeleccionado)
+  let data = modoBuscador
     ? datosGlobal
     : datosGlobal.filter(d=>d.mes.key===mesSeleccionado);
 
@@ -295,11 +292,10 @@ function renderTabla(data){
   document.getElementById("tablaResumen").innerHTML=html;
 }
 
-// ---------------- GRAFICO LIMPIO ----------------
+// ---------------- GRAFICO ----------------
 function renderGrafico(data){
 
   let ctx=document.getElementById("graficoZonas").getContext("2d");
-
   if(chart) chart.destroy();
 
   let zonas=Object.keys(data);
@@ -346,8 +342,7 @@ function renderMap(data){
       d.estado.includes("RECH")?"red":"orange";
 
     let m=L.circleMarker([c.lat,c.lon],{
-      radius:5,
-      color
+      radius:5,color
     }).addTo(map);
 
     m.bindPopup(`<b>${d.Zona}</b><br>${d.calle||""}<br>${d.estado}`);
@@ -356,7 +351,7 @@ function renderMap(data){
   });
 }
 
-// ---------------- DETALLE ----------------
+// ---------------- DETALLE (FIX COMPLETO) ----------------
 function renderDetalle(data){
 
   let zona=document.getElementById("filtroZona")?.value || "TODAS";
@@ -367,16 +362,28 @@ function renderDetalle(data){
            (!txt||limpiar(d.calle).includes(txt));
   });
 
-  let inicio=(pagina-1)*POR_PAGINA;
-  let page=filtrado.slice(inicio,inicio+POR_PAGINA);
-
   let html=`<table><tr>
-  <th>Zona</th><th>Calle</th><th>Estado</th></tr>`;
+  <th>Calle</th>
+  <th>Inicio</th>
+  <th>Fin</th>
+  <th>Diámetro</th>
+  <th>Longitud</th>
+  <th>Inicio Foto</th>
+  <th>Fin Foto</th>
+  <th>BR</th>
+  <th>Aprobación</th>
+  </tr>`;
 
-  page.forEach(d=>{
+  filtrado.forEach(d=>{
     html+=`<tr>
-    <td>${d.Zona}</td>
     <td>${d.calle||""}</td>
+    <td>${d.ini||""}</td>
+    <td>${d.fin||""}</td>
+    <td>${d.diam||""}</td>
+    <td>${d.long||0}</td>
+    <td>${d.f1?"✔️":""}</td>
+    <td>${d.f2?"✔️":""}</td>
+    <td>${d.f3?"✔️":""}</td>
     <td>${d.estado||""}</td>
     </tr>`;
   });
@@ -386,11 +393,14 @@ function renderDetalle(data){
   document.getElementById("tablaDetalle").innerHTML=html;
 }
 
-// ---------------- START ----------------
+// ---------------- START (FIX CLAVE) ----------------
 async function start(){
   initMap();
   await loadCoords();
   await loadData();
+
+  // ❌ NO calcular aquí
+  // ❌ evita render global automático
 }
 
 start();
