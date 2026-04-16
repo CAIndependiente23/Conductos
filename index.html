@@ -9,18 +9,10 @@
 <style>
 body { font-family: Arial; margin: 20px; }
 
-h2 { margin-bottom: 10px; }
-
 .botones button {
   margin: 5px;
   padding: 6px 10px;
   cursor: pointer;
-  border: 1px solid #ccc;
-  background: #f5f5f5;
-}
-
-.botones button:hover {
-  background: #ddd;
 }
 
 table {
@@ -43,16 +35,13 @@ th { background: #eee; }
 
 <h2>Dashboard por Zona</h2>
 
-<div class="botones" id="botonesMes"></div>
-
+<div id="botonesMes"></div>
 <div id="tablaResumen"></div>
 
 <script>
 
-// 🔗 GOOGLE SHEETS
 const URL_CSV = "https://docs.google.com/spreadsheets/d/1OsRXS125K9GfH24Qa6nriI4-MUeQB_OWWhJBdi1arw0/export?format=csv&gid=0";
 
-// 📊 PLIEGO
 const pliego = {
   "Zona 1": 2590,
   "Zona 2": 15246,
@@ -64,28 +53,24 @@ const pliego = {
 let datosGlobal = [];
 let certificadoSeleccionado = null;
 
-// 🔧 Normalizar texto (clave para evitar errores)
+// 🔧 normalizar texto
 function limpiarTexto(txt) {
   if (!txt) return "";
-  return txt
-    .toString()
-    .trim()
-    .toUpperCase()
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "");
+  return txt.toString().trim().toUpperCase()
+    .normalize("NFD").replace(/[\u0300-\u036f]/g, "");
 }
 
-// 📅 Parse fecha (dd/mm/yyyy)
+// 📅 parse fecha
 function parseFecha(fechaStr) {
   if (!fechaStr) return null;
 
   let partes = fechaStr.split(" ")[0].split("/");
   if (partes.length !== 3) return null;
 
-  return new Date(partes[2], partes[1] - 1, partes[0]);
+  return new Date(partes[2], partes[1]-1, partes[0]);
 }
 
-// 📥 Cargar datos
+// 📥 cargar CSV
 Papa.parse(URL_CSV, {
   download: true,
   header: true,
@@ -95,12 +80,12 @@ Papa.parse(URL_CSV, {
   }
 });
 
-// 🔘 BOTONES (Certificado)
+// 🔘 BOTONES
 function crearBotones() {
   const cont = document.getElementById("botonesMes");
 
   let certificados = [...new Set(
-    datosGlobal.map(d => d["Certificado"]).filter(c => c && c !== "")
+    datosGlobal.map(d => d["Certificado MES"]).filter(Boolean)
   )];
 
   certificados.forEach(c => {
@@ -119,7 +104,7 @@ function crearBotones() {
 // 🧠 CALCULAR
 function calcular() {
 
-  let filtrados = datosGlobal.filter(d => d["Certificado"] === certificadoSeleccionado);
+  let filtrados = datosGlobal.filter(d => d["Certificado MES"] === certificadoSeleccionado);
 
   let resultado = {};
 
@@ -139,7 +124,7 @@ function calcular() {
     let longitud = parseFloat(d["Longitud"]) || 0;
     let fecha = parseFecha(d["Marca temporal"]);
 
-    if (!zona || !resultado[zona]) return;
+    if (!resultado[zona]) return;
 
     if (estado === "APROBADO") {
       resultado[zona].longitud += longitud;
@@ -149,13 +134,8 @@ function calcular() {
       }
     }
 
-    if (estado === "RECHAZADO") {
-      resultado[zona].rechazados++;
-    }
-
-    if (estado === "EN REVISION") {
-      resultado[zona].revision++;
-    }
+    if (estado === "RECHAZADO") resultado[zona].rechazados++;
+    if (estado === "EN REVISION") resultado[zona].revision++;
   });
 
   renderTabla(resultado);
@@ -164,8 +144,7 @@ function calcular() {
 // 📊 TABLA
 function renderTabla(data) {
 
-  let html = `
-  <table>
+  let html = `<table>
     <tr>
       <th>Zona</th>
       <th>Longitud Aprobada</th>
@@ -173,26 +152,20 @@ function renderTabla(data) {
       <th>Última Aprobación</th>
       <th>Rechazados</th>
       <th>En Revisión</th>
-    </tr>
-  `;
+    </tr>`;
 
-  Object.keys(data).forEach(zona => {
-    let d = data[zona];
+  Object.keys(data).forEach(z => {
+    let d = data[z];
+    let porcentaje = ((d.longitud / pliego[z]) * 100 || 0).toFixed(1);
 
-    let porcentaje = pliego[zona]
-      ? ((d.longitud / pliego[zona]) * 100).toFixed(1)
-      : 0;
-
-    html += `
-      <tr>
-        <td>${zona}</td>
-        <td>${d.longitud.toFixed(0)}</td>
-        <td>${porcentaje}%</td>
-        <td>${d.ultimaFecha ? d.ultimaFecha.toLocaleDateString() : "-"}</td>
-        <td>${d.rechazados}</td>
-        <td>${d.revision}</td>
-      </tr>
-    `;
+    html += `<tr>
+      <td>${z}</td>
+      <td>${d.longitud.toFixed(0)}</td>
+      <td>${porcentaje}%</td>
+      <td>${d.ultimaFecha ? d.ultimaFecha.toLocaleDateString() : "-"}</td>
+      <td>${d.rechazados}</td>
+      <td>${d.revision}</td>
+    </tr>`;
   });
 
   html += `</table>`;
