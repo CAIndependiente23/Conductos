@@ -12,11 +12,7 @@
 <style>
 body { font-family: Arial; margin: 20px; }
 
-.botones button {
-  margin: 5px;
-  padding: 6px 10px;
-  cursor: pointer;
-}
+button { margin:5px; padding:6px; cursor:pointer; }
 
 table {
   border-collapse: collapse;
@@ -30,9 +26,9 @@ th, td {
   text-align: center;
 }
 
-th { background: #eee; }
+th { background:#eee; }
 
-.faltante { background-color: #ffdddd; }
+.faltante { background:#ffd6d6; }
 
 #map { height: 420px; margin-top: 20px; }
 </style>
@@ -42,333 +38,293 @@ th { background: #eee; }
 
 <h2>Limpieza de Conductos</h2>
 
-<div id="loading">Cargando datos...</div>
+<div id="botones"></div>
 
-<div class="botones" id="botonesMes"></div>
+<button onclick="setBuscador()">🔎 BUSCADOR GLOBAL</button>
 
-<button onclick="activarBuscador()">🔎 BUSCADOR GLOBAL</button>
+<hr>
 
-<div id="tablaResumen"></div>
+<div id="resumen"></div>
 
-<div style="width: 80%; margin: 20px auto;">
-  <canvas id="graficoZonas"></canvas>
-</div>
+<canvas id="grafico"></canvas>
 
 <h3>Mapa</h3>
 <div id="map"></div>
 
-<h3>Detalle de Registros</h3>
+<h3>Detalle</h3>
 
-<div style="margin-bottom:10px;">
-  <label>Zona:</label>
-  <select id="filtroZona">
-    <option value="TODAS">Todas</option>
-    <option>Zona 1</option>
-    <option>Zona 2</option>
-    <option>Zona 3</option>
-    <option>Zona 4</option>
-    <option>Zona 5</option>
-  </select>
+<select id="zona">
+  <option value="TODAS">Todas</option>
+  <option>Zona 1</option>
+  <option>Zona 2</option>
+  <option>Zona 3</option>
+  <option>Zona 4</option>
+  <option>Zona 5</option>
+</select>
 
-  <input id="buscadorCalle" placeholder="Buscar calle">
-</div>
+<input id="texto" placeholder="Buscar calle">
 
-<div id="tablaDetalle"></div>
+<div id="detalle"></div>
 
 <script>
 
+// ================= STATE =================
+const state = {
+  mode: "mes",
+  mes: null,
+  zona: "TODAS",
+  texto: ""
+};
+
 // ================= DATA =================
-const URLS_ZONAS = {
-  "Zona 1": "https://docs.google.com/spreadsheets/d/1HIJJCVYnwaDdAvgxfI4tBA-5wn_0B1Bog19cUgJYyuo/export?format=csv&gid=2037627206",
-  "Zona 2": "https://docs.google.com/spreadsheets/d/1_uR77zitjM6EpbPlmhg92VaNteJuYb28hQkDKbWX2V4/export?format=csv&gid=1607259408",
-  "Zona 3": "https://docs.google.com/spreadsheets/d/1Li4R4gjFHbFwryFgteY5KS3y43MGdiqL5zEu4NK_v6w/export?format=csv&gid=996112756",
-  "Zona 4": "https://docs.google.com/spreadsheets/d/1AZAvTvfohVXr8qKlZuejzD1FXHO5T2itzG8rZpbkVUc/export?format=csv&gid=184101373",
-  "Zona 5": "https://docs.google.com/spreadsheets/d/1gaPIk0bPccxj1Wi853iEzvPN3OhE92L1cHgMYJYgztI/export?format=csv&gid=1465503285"
-};
-
-const pliego = {
-  "Zona 1": 2590,
-  "Zona 2": 15246,
-  "Zona 3": 16238,
-  "Zona 4": 9980,
-  "Zona 5": 8309
-};
-
 let datosGlobal = [];
-let mesSeleccionado = null;
-let modoBuscador = false;
-
-let chart = null;
+let chart;
 let map;
 let markers = [];
 
-// ================= MAP =================
-function initMap(){
-  map = L.map('map').setView([-34.6,-58.38], 11);
+// ================= CONFIG =================
+const URLS = {
+ "Zona 1":"https://docs.google.com/spreadsheets/d/1HIJJCVYnwaDdAvgxfI4tBA-5wn_0B1Bog19cUgJYyuo/export?format=csv&gid=2037627206",
+ "Zona 2":"https://docs.google.com/spreadsheets/d/1_uR77zitjM6EpbPlmhg92VaNteJuYb28hQkDKbWX2V4/export?format=csv&gid=1607259408",
+ "Zona 3":"https://docs.google.com/spreadsheets/d/1Li4R4gjFHbFwryFgteY5KS3y43MGdiqL5zEu4NK_v6w/export?format=csv&gid=996112756",
+ "Zona 4":"https://docs.google.com/spreadsheets/d/1AZAvTvfohVXr8qKlZuejzD1FXHO5T2itzG8rZpbkVUc/export?format=csv&gid=184101373",
+ "Zona 5":"https://docs.google.com/spreadsheets/d/1gaPIk0bPccxj1Wi853iEzvPN3OhE92L1cHgMYJYgztI/export?format=csv&gid=1465503285"
+};
 
-  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{
-    attribution:'OSM'
-  }).addTo(map);
-}
+const pliego = {
+ "Zona 1":2590,
+ "Zona 2":15246,
+ "Zona 3":16238,
+ "Zona 4":9980,
+ "Zona 5":8309
+};
 
 // ================= UTILS =================
-function limpiar(t){
-  return (t||"").toString().trim().toUpperCase()
-  .normalize("NFD").replace(/[\u0300-\u036f]/g,"");
+function clean(t){
+ return (t||"").toString().toUpperCase()
+ .normalize("NFD").replace(/[\u0300-\u036f]/g,"");
 }
 
 function get(r,n){
-  let k=Object.keys(r).find(x=>limpiar(x)===limpiar(n));
-  return k?r[k]:null;
+ let k=Object.keys(r).find(x=>clean(x)===clean(n));
+ return k?r[k]:null;
 }
 
 function num(v){
-  return parseFloat((v||"").toString().replace(".","").replace(",",".")||0);
+ return parseFloat((v||"").toString().replace(".","").replace(",",".")||0);
 }
 
 // ================= MES =================
 function parseMes(t){
-  const m=["ENERO","FEBRERO","MARZO","ABRIL","MAYO","JUNIO","JULIO","AGOSTO","SEPTIEMBRE","OCTUBRE","NOVIEMBRE","DICIEMBRE"];
-  const c=["ENE","FEB","MAR","ABR","MAY","JUN","JUL","AGO","SEP","OCT","NOV","DIC"];
+ const m=["ENERO","FEBRERO","MARZO","ABRIL","MAYO","JUNIO","JULIO","AGOSTO","SEPTIEMBRE","OCTUBRE","NOVIEMBRE","DICIEMBRE"];
+ const c=["ENE","FEB","MAR","ABR","MAY","JUN","JUL","AGO","SEP","OCT","NOV","DIC"];
 
-  t=limpiar(t);
-  let i=m.findIndex(x=>t.includes(x));
-  let y=(t.match(/\d{4}/)||[])[0];
-  if(i<0||!y)return null;
+ t=clean(t);
+ let i=m.findIndex(x=>t.includes(x));
+ let y=(t.match(/\d{4}/)||[])[0];
+ if(i<0||!y)return null;
 
-  let label=c[i]+"-"+y.slice(2);
+ let label=c[i]+"-"+y.slice(2);
+ if(label==="JUL-25"||label==="AGO-25")return null;
 
-  if(label==="JUL-25" || label==="AGO-25") return null;
+ return {key:new Date(y,i,1).getTime(),label};
+}
 
-  return {key:new Date(y,i,1).getTime(),label};
+// ================= INIT =================
+async function init(){
+
+ map=L.map("map").setView([-34.6,-58.38],11);
+ L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png").addTo(map);
+
+ await loadData();
 }
 
 // ================= LOAD =================
 async function loadData(){
 
-  let prom=Object.entries(URLS_ZONAS).map(([z,url])=>new Promise(res=>{
-    Papa.parse(url,{
-      download:true,
-      header:true,
-      complete:r=>{
-        res(r.data.map(d=>({
-          Zona:z,
-          mes:parseMes(get(d,"Certificado MES")),
-          estado:get(d,"Aprobación"),
-          long:num(get(d,"Longitud")),
-          calle:get(d,"Calle de traza"),
-          ini:get(d,"Intersección Inicio"),
-          fin:get(d,"Intersección Fin"),
-          diam:get(d,"Diámetro"),
-          f1:get(d,"Foto Bajada I (Inicio)"),
-          f2:get(d,"Foto Bajada II (Fin)"),
-          f3:get(d,"Foto BR")
-        })));
-      }
-    });
-  }));
+ let prom=Object.entries(URLS).map(([z,url])=>new Promise(res=>{
+  Papa.parse(url,{
+   download:true,
+   header:true,
+   complete:r=>{
+    res(r.data.map(d=>({
+      Zona:z,
+      mes:parseMes(get(d,"Certificado MES")),
+      estado:get(d,"Aprobación"),
+      long:num(get(d,"Longitud")),
+      calle:get(d,"Calle de traza"),
+      ini:get(d,"Intersección Inicio"),
+      fin:get(d,"Intersección Fin"),
+      f1:get(d,"Foto Bajada I (Inicio)"),
+      f2:get(d,"Foto Bajada II (Fin)"),
+      f3:get(d,"Foto BR")
+    })));
+   }
+  });
+ }));
 
-  datosGlobal=(await Promise.all(prom)).flat().filter(d=>d.mes);
+ datosGlobal=(await Promise.all(prom)).flat().filter(d=>d.mes);
 
-  document.getElementById("loading").style.display="none";
-
-  crearBotones();
+ buildButtons();
+ render();
 }
 
-// ================= BOTONES =================
-function crearBotones(){
+// ================= STATE FILTER =================
+function getData(){
 
-  let cont=document.getElementById("botonesMes");
-  cont.innerHTML="";
+ if(state.mode==="buscador") return datosGlobal;
 
-  let meses=[...new Map(datosGlobal.map(d=>[d.mes.key,d.mes])).values()]
-  .sort((a,b)=>a.key-b.key);
-
-  meses.forEach(m=>{
-    let b=document.createElement("button");
-    b.innerText=m.label;
-
-    b.onclick=()=>{
-      modoBuscador=false;
-      mesSeleccionado=m.key;
-
-      document.getElementById("buscadorCalle").value="";
-      document.getElementById("filtroZona").value="TODAS";
-
-      calcular();
-    };
-
-    cont.appendChild(b);
-  });
+ return datosGlobal.filter(d=>d.mes.key===state.mes);
 }
 
-// ================= BUSCADOR =================
-function activarBuscador(){
-  modoBuscador=true;
-  mesSeleccionado=null;
+// ================= RENDER =================
+function render(){
 
-  document.getElementById("tablaResumen").innerHTML="";
-  if(chart) chart.destroy();
+ let data=getData();
 
-  renderDetalle(datosGlobal);
-  renderMap(datosGlobal);
+ renderResumen(data);
+ renderGrafico(data);
+ renderDetalle(data);
+ renderMapa(data);
 }
 
-// ================= CALCULAR =================
-function calcular(){
+// ================= RESUMEN =================
+function renderResumen(data){
 
-  let data = modoBuscador
-    ? datosGlobal
-    : datosGlobal.filter(d=>d.mes.key===mesSeleccionado);
+ let res={};
+ Object.keys(pliego).forEach(z=>res[z]=0);
 
-  let res={};
+ data.forEach(d=>{
+  if(d.estado?.includes("APROBADO")){
+    res[d.Zona]+=d.long;
+  }
+ });
 
-  Object.keys(pliego).forEach(z=>{
-    res[z]={longitud:0,rechazados:0,revision:0};
-  });
+ let html="<table><tr><th>Zona</th><th>%</th></tr>";
 
-  data.forEach(d=>{
-    let e=limpiar(d.estado);
-    if(!e) return;
+ Object.keys(res).forEach(z=>{
+  let p=(res[z]/pliego[z]*100||0).toFixed(1);
+  html+=`<tr><td>${z}</td><td>${p}%</td></tr>`;
+ });
 
-    if(e==="APROBADO"||e.includes("50")){
-      res[d.Zona].longitud+=d.long*(e.includes("50")?0.5:1);
-    }
-    if(e.includes("RECH")) res[d.Zona].rechazados+=d.long;
-    if(e.includes("REV")) res[d.Zona].revision+=d.long;
-  });
+ html+="</table>";
 
-  renderTabla(res);
-  renderGrafico(res);
-  renderMap(data);
-  renderDetalle(data);
-}
-
-// ================= TABLA =================
-function renderTabla(data){
-
-  let html=`<table><tr>
-  <th>Zona</th><th>Aprobado</th><th>%</th><th>Faltantes</th>
-  <th>Rech</th><th>Rev</th></tr>`;
-
-  Object.keys(data).forEach(z=>{
-    let d=data[z];
-    let p=(d.longitud/pliego[z]*100||0).toFixed(1);
-    let f=pliego[z]-d.longitud;
-
-    html+=`<tr>
-    <td>${z}</td>
-    <td>${d.longitud.toFixed(0)}</td>
-    <td>${p}%</td>
-    <td class="${f>0?'faltante':''}">${f.toFixed(0)}</td>
-    <td>${d.rechazados.toFixed(0)}</td>
-    <td>${d.revision.toFixed(0)}</td>
-    </tr>`;
-  });
-
-  html+="</table>";
-  document.getElementById("tablaResumen").innerHTML=html;
+ document.getElementById("resumen").innerHTML=html;
 }
 
 // ================= GRAFICO =================
 function renderGrafico(data){
 
-  let ctx=document.getElementById("graficoZonas").getContext("2d");
-  if(chart) chart.destroy();
+ if(chart) chart.destroy();
 
-  let zonas=Object.keys(data);
-  let vals=zonas.map(z=>(data[z].longitud/pliego[z]*100||0));
+ let zonas=Object.keys(pliego);
 
-  chart=new Chart(ctx,{
-    type:"bar",
-    data:{
-      labels:zonas,
-      datasets:[
-        {
-          data:vals,
-          backgroundColor:['#FFD700','#007BFF','#FF69B4','#28A745','#FF8C00']
-        },
-        {
-          type:'line',
-          data:zonas.map(()=>100),
-          borderDash:[5,5],
-          borderColor:'#999',
-          pointRadius:0
-        }
-      ]
-    },
-    options:{
-      plugins:{legend:{display:false}},
-      indexAxis:'y',
-      scales:{x:{max:120}}
-    }
-  });
-}
+ let vals=zonas.map(z=>{
+  let total=data.filter(d=>d.Zona===z && d.estado?.includes("APROBADO"))
+  .reduce((a,b)=>a+b.long,0);
 
-// ================= MAP =================
-function renderMap(data){
+  return total/pliego[z]*100;
+ });
 
-  markers.forEach(m=>map.removeLayer(m));
-  markers=[];
-
-  data.forEach(d=>{
-    if(!d.lat) return;
-
-    let color =
-      d.estado.includes("APROBADO")?"green":
-      d.estado.includes("RECH")?"red":"orange";
-
-    let m=L.circleMarker([d.lat,d.lon],{
-      radius:5,color
-    }).addTo(map);
-
-    m.bindPopup(`<b>${d.Zona}</b><br>${d.calle||""}`);
-    markers.push(m);
-  });
+ chart=new Chart(document.getElementById("grafico"),{
+  type:"bar",
+  data:{
+   labels:zonas,
+   datasets:[
+    {data:vals,backgroundColor:["#FFD700","#007BFF","#FF69B4","#28A745","#FF8C00"]},
+    {type:"line",data:zonas.map(()=>100),borderDash:[6,6],borderColor:"#999",pointRadius:0}
+   ]
+  },
+  options:{
+   plugins:{legend:{display:false}},
+   indexAxis:"y",
+   scales:{x:{max:120}}
+  }
+ });
 }
 
 // ================= DETALLE =================
 function renderDetalle(data){
 
-  let zona=document.getElementById("filtroZona")?.value || "TODAS";
-  let txt=limpiar(document.getElementById("buscadorCalle")?.value || "");
+ let zona=document.getElementById("zona").value;
+ let txt=clean(document.getElementById("texto").value);
 
-  let filtrado=data.filter(d=>{
-    return (zona==="TODAS"||d.Zona===zona) &&
-           (!txt||limpiar(d.calle).includes(txt));
-  });
+ let f=data.filter(d=>{
+  let okZ=zona==="TODAS"||d.Zona===zona;
+  let okT=!txt||clean(d.calle).includes(txt);
+  return okZ&&okT;
+ });
 
-  let html=`<table><tr>
-  <th>Calle</th><th>Inicio</th><th>Fin</th>
-  <th>Diámetro</th><th>Long</th>
-  <th>Inicio Foto</th><th>Fin Foto</th><th>BR Foto</th>
-  <th>Aprobación</th></tr>`;
+ let html="<table><tr><th>Calle</th><th>Inicio</th><th>Fin</th><th>Long</th><th>Fotos</th></tr>";
 
-  filtrado.forEach(d=>{
-    html+=`<tr>
-    <td>${d.calle||""}</td>
-    <td>${d.ini||""}</td>
-    <td>${d.fin||""}</td>
-    <td>${d.diam||""}</td>
-    <td>${d.long||0}</td>
-    <td>${d.f1?`<a target="_blank" href="${d.f1}">ver</a>`:""}</td>
-    <td>${d.f2?`<a target="_blank" href="${d.f2}">ver</a>`:""}</td>
-    <td>${d.f3?`<a target="_blank" href="${d.f3}">ver</a>`:""}</td>
-    <td>${d.estado||""}</td>
-    </tr>`;
-  });
+ f.forEach(d=>{
+  html+=`<tr>
+  <td>${d.calle||""}</td>
+  <td>${d.ini||""}</td>
+  <td>${d.fin||""}</td>
+  <td>${d.long}</td>
+  <td>
+   ${d.f1?`<a target="_blank" href="${d.f1}">I</a>`:""}
+   ${d.f2?`<a target="_blank" href="${d.f2}">F</a>`:""}
+   ${d.f3?`<a target="_blank" href="${d.f3}">BR</a>`:""}
+  </td>
+  </tr>`;
+ });
 
-  html+="</table>";
-  document.getElementById("tablaDetalle").innerHTML=html;
+ html+="</table>";
+ document.getElementById("detalle").innerHTML=html;
 }
+
+// ================= MAP =================
+function renderMapa(data){
+
+ markers.forEach(m=>map.removeLayer(m));
+ markers=[];
+
+ data.forEach(d=>{
+  let lat=0,lon=0;
+  if(!lat) return;
+
+  let m=L.circleMarker([lat,lon]).addTo(map);
+  markers.push(m);
+ });
+}
+
+// ================= BUTTONS =================
+function buildButtons(){
+
+ let meses=[...new Map(datosGlobal.map(d=>[d.mes.key,d.mes])).values()]
+ .sort((a,b)=>a.key-b.key);
+
+ let div=document.getElementById("botones");
+ div.innerHTML="";
+
+ meses.forEach(m=>{
+  let b=document.createElement("button");
+  b.innerText=m.label;
+
+  b.onclick=()=>{
+   state.mode="mes";
+   state.mes=m.key;
+   render();
+  };
+
+  div.appendChild(b);
+ });
+}
+
+// ================= BUSCADOR =================
+function setBuscador(){
+ state.mode="buscador";
+ render();
+}
+
+// ================= EVENTS =================
+document.getElementById("zona").addEventListener("change",render);
+document.getElementById("texto").addEventListener("input",render);
 
 // ================= START =================
-async function start(){
-  initMap();
-  await loadData();
-}
-
-start();
+init();
 
 </script>
 
