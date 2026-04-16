@@ -198,7 +198,7 @@ async function loadData(){
 
   document.getElementById("loading").style.display="none";
 
-  crearBotones(); // 🔴 FIX: NO calcular aquí
+  crearBotones();
 }
 
 // ---------------- BOTONES ----------------
@@ -345,13 +345,19 @@ function renderMap(data){
       radius:5,color
     }).addTo(map);
 
-    m.bindPopup(`<b>${d.Zona}</b><br>${d.calle||""}<br>${d.estado}`);
+    let fotos = `
+      ${d.f1?`<a href="${d.f1}" target="_blank">Inicio</a><br>`:""}
+      ${d.f2?`<a href="${d.f2}" target="_blank">Fin</a><br>`:""}
+      ${d.f3?`<a href="${d.f3}" target="_blank">BR</a>`:""}
+    `;
+
+    m.bindPopup(`<b>${d.Zona}</b><br>${d.calle||""}<br>${fotos}`);
 
     markers.push(m);
   });
 }
 
-// ---------------- DETALLE (FIX COMPLETO) ----------------
+// ---------------- DETALLE (FIX FINAL) ----------------
 function renderDetalle(data){
 
   let zona=document.getElementById("filtroZona")?.value || "TODAS";
@@ -370,7 +376,7 @@ function renderDetalle(data){
   <th>Longitud</th>
   <th>Inicio Foto</th>
   <th>Fin Foto</th>
-  <th>BR</th>
+  <th>BR Foto</th>
   <th>Aprobación</th>
   </tr>`;
 
@@ -381,26 +387,22 @@ function renderDetalle(data){
     <td>${d.fin||""}</td>
     <td>${d.diam||""}</td>
     <td>${d.long||0}</td>
-    <td>${d.f1?"✔️":""}</td>
-    <td>${d.f2?"✔️":""}</td>
-    <td>${d.f3?"✔️":""}</td>
+    <td>${d.f1?`<a href="${d.f1}" target="_blank">ver</a>`:""}</td>
+    <td>${d.f2?`<a href="${d.f2}" target="_blank">ver</a>`:""}</td>
+    <td>${d.f3?`<a href="${d.f3}" target="_blank">ver</a>`:""}</td>
     <td>${d.estado||""}</td>
     </tr>`;
   });
 
   html+="</table>";
-
   document.getElementById("tablaDetalle").innerHTML=html;
 }
 
-// ---------------- START (FIX CLAVE) ----------------
+// ---------------- START ----------------
 async function start(){
   initMap();
   await loadCoords();
   await loadData();
-
-  // ❌ NO calcular aquí
-  // ❌ evita render global automático
 }
 
 start();
