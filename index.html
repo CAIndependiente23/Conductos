@@ -42,6 +42,7 @@ th { background: #eee; }
 
 const URL_CSV = "https://docs.google.com/spreadsheets/d/1OsRXS125K9GfH24Qa6nriI4-MUeQB_OWWhJBdi1arw0/export?format=csv&gid=0";
 
+// 📊 PLIEGO
 const pliego = {
   "Zona 1": 2590,
   "Zona 2": 15246,
@@ -53,7 +54,7 @@ const pliego = {
 let datosGlobal = [];
 let certificadoSeleccionado = null;
 
-// 🔧 limpiar texto
+// 🔧 normalizar texto
 function limpiarTexto(txt) {
   if (!txt) return "";
   return txt.toString().trim().toUpperCase()
@@ -68,7 +69,18 @@ function normalizarZona(z) {
   return null;
 }
 
-// 📅 fecha (solo para última actualización)
+// 🔢 parse número (formato argentino)
+function parseNumero(valor) {
+  if (!valor) return 0;
+
+  let limpio = valor.toString()
+    .replace(/\./g, "")
+    .replace(",", ".");
+
+  return parseFloat(limpio) || 0;
+}
+
+// 📅 parse fecha
 function parseFecha(fechaStr) {
   if (!fechaStr) return null;
 
@@ -78,7 +90,7 @@ function parseFecha(fechaStr) {
   return new Date(partes[2], partes[1]-1, partes[0]);
 }
 
-// 📥 cargar
+// 📥 cargar CSV
 Papa.parse(URL_CSV, {
   download: true,
   header: true,
@@ -88,7 +100,7 @@ Papa.parse(URL_CSV, {
   }
 });
 
-// 🔘 BOTONES (todos excepto julio/agosto)
+// 🔘 BOTONES (sin julio/agosto)
 function crearBotones() {
   const cont = document.getElementById("botonesMes");
 
@@ -115,7 +127,7 @@ function crearBotones() {
   });
 }
 
-// 🧠 CALCULAR (CORREGIDO)
+// 🧠 CALCULAR
 function calcular() {
 
   let filtrados = datosGlobal.filter(d => 
@@ -137,23 +149,28 @@ function calcular() {
 
     let zona = normalizarZona(d["Zona"]);
     let estado = limpiarTexto(d["Aprobación"]);
-    let longitud = parseFloat(d["Longitud"]) || 0;
+    let longitud = parseNumero(d["Longitud"]);
     let fecha = parseFecha(d["Marca temporal"]);
 
     if (!zona) return;
 
-    if (estado === "APROBADO") {
-      resultado[zona].longitud += longitud;
+    // ✅ APROBADO o 50%
+    if (estado === "APROBADO" || estado.includes("50")) {
+      let factor = estado.includes("50") ? 0.5 : 1;
+
+      resultado[zona].longitud += longitud * factor;
 
       if (fecha && (!resultado[zona].ultimaFecha || fecha > resultado[zona].ultimaFecha)) {
         resultado[zona].ultimaFecha = fecha;
       }
     }
 
+    // ❌ RECHAZADO
     if (estado.includes("RECHAZ")) {
       resultado[zona].rechazados += longitud;
     }
 
+    // 🟡 EN REVISION
     if (estado.includes("REVISION")) {
       resultado[zona].revision += longitud;
     }
@@ -163,7 +180,7 @@ function calcular() {
   renderTabla(resultado);
 }
 
-// 📊 tabla
+// 📊 TABLA
 function renderTabla(data) {
 
   let html = `<table>
