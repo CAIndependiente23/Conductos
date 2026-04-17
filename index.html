@@ -26,7 +26,6 @@ h2 { margin-bottom: 10px; }
   background: #1f4fb5;
 }
 
-/* TABLAS */
 table {
   border-collapse: collapse;
   width: 100%;
@@ -127,7 +126,7 @@ let modo = null;
 let mesSeleccionado = null;
 let chart = null;
 
-// UTILS
+// ================= UTILS =================
 function limpiarTexto(txt) {
   return (txt || "").toString().trim().toUpperCase()
     .normalize("NFD").replace(/[\u0300-\u036f]/g, "");
@@ -167,7 +166,7 @@ function parseMes(texto) {
   };
 }
 
-// LOAD
+// ================= LOAD =================
 async function cargarDatos() {
 
   let promesas = Object.entries(URLS_ZONAS).map(([zona, url]) =>
@@ -200,11 +199,10 @@ async function cargarDatos() {
   datosGlobal = (await Promise.all(promesas)).flat().filter(d => d.mes);
 
   document.getElementById("loading").style.display = "none";
-
   crearBotones();
 }
 
-// BOTONES
+// ================= BOTONES =================
 function crearBotones() {
 
   let cont = document.getElementById("botonesMes");
@@ -220,7 +218,8 @@ function crearBotones() {
   cont.appendChild(b);
 
   let meses = [...new Map(datosGlobal.map(d => [d.mes.key,d.mes])).values()]
-    .sort((a,b)=>a.key-b.key);
+    .sort((a,b)=>a.key-b.key)
+    .filter(m => m.label !== "JUL-25" && m.label !== "AGO-25");
 
   meses.forEach(m => {
     let b = document.createElement("button");
@@ -236,7 +235,7 @@ function crearBotones() {
   });
 }
 
-// 🔥 FUNCION CORREGIDA
+// ================= CALCULAR =================
 function calcular() {
 
   if (!modo) return;
@@ -249,9 +248,8 @@ function calcular() {
 
   if (modo === "buscador") {
     filtrados = datosGlobal;
-
     renderDetalle(filtrados);
-    return; // 👈 CLAVE: evita gráfico y tabla resumen
+    return;
   }
 
   let res = {};
@@ -279,7 +277,7 @@ function calcular() {
   renderDetalle(filtrados);
 }
 
-// TABLA
+// ================= TABLA =================
 function renderTabla(data){
 
   let html=`<table><tr>
@@ -304,41 +302,46 @@ function renderTabla(data){
   document.getElementById("tablaResumen").innerHTML=html;
 }
 
-// GRAFICO
+// ================= GRAFICO =================
 function renderGrafico(data){
 
   if(chart) chart.destroy();
 
-  let zonas=Object.keys(data);
+  let zonas = Object.keys(data);
 
-  let vals=zonas.map(z =>
-    Number(((data[z].longitud/pliego[z])*100).toFixed(1))
+  let vals = zonas.map(z =>
+    Number(((data[z].longitud / pliego[z]) * 100).toFixed(1))
   );
 
-  chart=new Chart(document.getElementById("graficoZonas"),{
-    type:"bar",
-    data:{
-      labels:zonas,
-      datasets:[
-        { data:vals },
+  chart = new Chart(document.getElementById("graficoZonas"), {
+    type: "bar",
+    data: {
+      labels: zonas,
+      datasets: [
         {
-          type:'line',
-          data:zonas.map(()=>100),
-          borderDash:[6,6],
-          borderColor:"rgba(0,0,0,0.25)",
-          pointRadius:0
+          label: "Avance %",
+          data: vals,
+          backgroundColor: ["#FFD700","#007BFF","#FF69B4","#28A745","#FF8C00"]
+        },
+        {
+          type: "line",
+          label: "Meta 100%",
+          data: zonas.map(()=>100),
+          borderDash: [6,6],
+          borderColor: "rgba(0,0,0,0.3)",
+          pointRadius: 0
         }
       ]
     },
-    options:{
-      indexAxis:'y',
-      plugins:{legend:{display:false}},
-      scales:{x:{suggestedMax:120}}
+    options: {
+      indexAxis: "y",
+      plugins: { legend: { display: false } },
+      scales: { x: { suggestedMax: 120 } }
     }
   });
 }
 
-// DETALLE
+// ================= DETALLE =================
 function renderDetalle(filtrados){
 
   let zona=document.getElementById("filtroZona").value;
@@ -375,7 +378,7 @@ function renderDetalle(filtrados){
   document.getElementById("tablaDetalle").innerHTML=html;
 }
 
-// EVENTS
+// ================= EVENTS =================
 document.addEventListener("input",calcular);
 document.addEventListener("change",calcular);
 
