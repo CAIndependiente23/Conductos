@@ -22,9 +22,7 @@ h2 { margin-bottom: 10px; }
   border-radius: 6px;
 }
 
-.botones button:hover {
-  background: #1f4fb5;
-}
+.botones button:hover { background: #1f4fb5; }
 
 table {
   border-collapse: collapse;
@@ -53,15 +51,6 @@ td {
 tr:nth-child(even) { background-color: #fafafa; }
 tr:hover { background-color: #eef5ff; }
 
-.faltante {
-  background-color: #ffe1e1;
-  font-weight: bold;
-  color: #a10000;
-}
-
-a { color:#2d6cdf; text-decoration:none; }
-a:hover { text-decoration:underline; }
-
 #graficoZonas {
   background: white;
   padding: 10px;
@@ -80,7 +69,7 @@ a:hover { text-decoration:underline; }
 
 <div id="tablaResumen"></div>
 
-<div style="width: 80%; margin: 40px auto;">
+<div id="graficoContainer" style="width: 80%; margin: 40px auto;">
   <canvas id="graficoZonas"></canvas>
 </div>
 
@@ -126,6 +115,17 @@ let modo = null;
 let mesSeleccionado = null;
 let chart = null;
 
+// ================= UI HELPERS =================
+function mostrarDashboard() {
+  document.getElementById("tablaResumen").style.display = "block";
+  document.getElementById("graficoContainer").style.display = "block";
+}
+
+function mostrarBuscador() {
+  document.getElementById("tablaResumen").style.display = "none";
+  document.getElementById("graficoContainer").style.display = "none";
+}
+
 // ================= UTILS =================
 function limpiarTexto(txt) {
   return (txt || "").toString().trim().toUpperCase()
@@ -142,12 +142,6 @@ function parseNumero(valor) {
   return parseFloat(limpio) || 0;
 }
 
-function parseFecha(f) {
-  if (!f) return null;
-  let p = f.split(" ")[0].split("/");
-  return new Date(p[2], p[1]-1, p[0]);
-}
-
 function parseMes(texto) {
   const meses = ["ENERO","FEBRERO","MARZO","ABRIL","MAYO","JUNIO","JULIO","AGOSTO","SEPTIEMBRE","OCTUBRE","NOVIEMBRE","DICIEMBRE"];
   const corto = ["ENE","FEB","MAR","ABR","MAY","JUN","JUL","AGO","SEP","OCT","NOV","DIC"];
@@ -158,10 +152,8 @@ function parseMes(texto) {
 
   if (i < 0 || !y) return null;
 
-  let fecha = new Date(y, i, 1);
-
   return {
-    key: fecha.getTime(),
+    key: new Date(y, i, 1).getTime(),
     label: corto[i] + "-" + y.slice(2)
   };
 }
@@ -181,9 +173,8 @@ async function cargarDatos() {
             mes: parseMes(getColumna(d,"Certificado MES")),
             estado: getColumna(d,"Aprobación"),
             longitud: getColumna(d,"Longitud"),
-            fecha: getColumna(d,"Marca temporal"),
-            comuna: getColumna(d,"Comuna"),
             calle: getColumna(d,"Calle de traza"),
+            comuna: getColumna(d,"Comuna"),
             inicio: getColumna(d,"Intersección Inicio"),
             fin: getColumna(d,"Intersección Fin"),
             diametro: getColumna(d,"Diámetro"),
@@ -200,6 +191,8 @@ async function cargarDatos() {
 
   document.getElementById("loading").style.display = "none";
   crearBotones();
+
+  mostrarDashboard();
 }
 
 // ================= BOTONES =================
@@ -210,11 +203,15 @@ function crearBotones() {
 
   let b = document.createElement("button");
   b.innerText = "🔍 BUSCADOR GLOBAL";
+
   b.onclick = () => {
     modo = "buscador";
     mesSeleccionado = null;
+
+    mostrarBuscador(); // 🔥 limpia vista
     calcular();
   };
+
   cont.appendChild(b);
 
   let meses = [...new Map(datosGlobal.map(d => [d.mes.key,d.mes])).values()]
@@ -228,6 +225,8 @@ function crearBotones() {
     b.onclick = () => {
       modo = "mes";
       mesSeleccionado = m.key;
+
+      mostrarDashboard(); // 🔥 restaura vista
       calcular();
     };
 
@@ -242,15 +241,13 @@ function calcular() {
 
   let filtrados = [];
 
-  if (modo === "mes") {
-    filtrados = datosGlobal.filter(d => d.mes.key === mesSeleccionado);
-  }
-
   if (modo === "buscador") {
     filtrados = datosGlobal;
     renderDetalle(filtrados);
     return;
   }
+
+  filtrados = datosGlobal.filter(d => d.mes.key === mesSeleccionado);
 
   let res = {};
   Object.keys(pliego).forEach(z =>
@@ -268,6 +265,7 @@ function calcular() {
       let fac=e.includes("50")?0.5:1;
       res[z].longitud += l*fac;
     }
+
     if(e.includes("RECHAZ")) res[z].rechazados += l;
     if(e.includes("REVISION")) res[z].revision += l;
   });
@@ -299,7 +297,7 @@ function renderTabla(data){
     </tr>`;
   });
 
-  document.getElementById("tablaResumen").innerHTML=html;
+  document.getElementById("tablaResumen").innerHTML = html;
 }
 
 // ================= GRAFICO =================
@@ -325,7 +323,7 @@ function renderGrafico(data){
         },
         {
           type: "line",
-          label: "Meta 100%",
+          label: "Meta",
           data: zonas.map(()=>100),
           borderDash: [6,6],
           borderColor: "rgba(0,0,0,0.3)",
@@ -375,7 +373,7 @@ function renderDetalle(filtrados){
     </tr>`;
   });
 
-  document.getElementById("tablaDetalle").innerHTML=html;
+  document.getElementById("tablaDetalle").innerHTML = html;
 }
 
 // ================= EVENTS =================
