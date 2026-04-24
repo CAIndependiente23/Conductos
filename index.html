@@ -65,7 +65,7 @@ tr:hover { background-color: #eef5ff; }
 
 <div id="tablaResumen"></div>
 
-<!-- CONTENEDOR GRAFICO + MAPA -->
+<!-- GRAFICO + MAPA -->
 <div id="contenedorVisual" style="display:flex; gap:20px; margin:40px auto; width:90%;">
   <div style="flex:1; background:white; padding:10px; border-radius:10px;">
     <canvas id="graficoZonas"></canvas>
@@ -195,6 +195,12 @@ async function cargarDatos() {
 
   document.getElementById("loading").style.display = "none";
   crearBotones();
+
+  // 🔥 INICIO AUTOMÁTICO EN BUSCADOR
+  modo = "buscador";
+  mesSeleccionado = null;
+  ocultarDashboard();
+  calcular();
 }
 
 // ================= BOTONES =================
@@ -209,8 +215,7 @@ function crearBotones() {
   b.onclick = () => {
     modo = "buscador";
     mesSeleccionado = null;
-
-    ocultarDashboard(); // 🔥 clave
+    ocultarDashboard();
     calcular();
   };
 
@@ -226,8 +231,7 @@ function crearBotones() {
     b.onclick = () => {
       modo = "mes";
       mesSeleccionado = m.key;
-
-      mostrarDashboard(); // 🔥 clave
+      mostrarDashboard();
       calcular();
     };
 
