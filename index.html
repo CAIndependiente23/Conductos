@@ -195,7 +195,6 @@ async function cargarDatos() {
   document.getElementById("loading").style.display = "none";
   crearBotones();
 
-  // Inicio en buscador
   modo = "buscador";
   ocultarDashboard();
   calcular();
@@ -283,7 +282,6 @@ function renderMapa(filtrados){
 
   if(!map){
     map = L.map('mapa').setView([-34.61, -58.38], 11);
-
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
     markersLayer = L.layerGroup().addTo(map);
   }
@@ -316,6 +314,54 @@ function renderMapa(filtrados){
 
     markersLayer.addLayer(marker);
   });
+}
+
+// TABLA DETALLE (MODIFICADA)
+function renderDetalle(filtrados){
+
+  let zona=document.getElementById("filtroZona").value;
+  let txt=limpiarTexto(document.getElementById("buscadorCalle").value);
+
+  let datos=filtrados.filter(d=>{
+    return (zona==="TODAS"||d.Zona===zona) &&
+           (!txt || limpiarTexto(d.calle).includes(txt));
+  });
+
+  let html=`<table><tr>
+  <th>Zona</th>`;
+
+  if(modo === "buscador"){
+    html += `<th>Certificado MES</th>`;
+  }
+
+  html += `<th>Comuna</th><th>Calle</th>
+  <th>Inicio</th><th>Fin</th><th>Diámetro</th>
+  <th>Longitud</th><th>Aprobación</th><th>Fotos</th></tr>`;
+
+  datos.forEach(d=>{
+    html+=`<tr>
+    <td>${d.Zona}</td>`;
+
+    if(modo === "buscador"){
+      html += `<td>${d.mes?.label || "-"}</td>`;
+    }
+
+    html+=`<td>${d.comuna||"-"}</td>
+    <td>${d.calle||"-"}</td>
+    <td>${d.inicio||"-"}</td>
+    <td>${d.fin||"-"}</td>
+    <td>${d.diametro||"-"}</td>
+    <td>${parseNumero(d.longitud).toFixed(0)}</td>
+    <td>${d.estado||"-"}</td>
+    <td>
+      ${d.f1?`<a target="_blank" href="${d.f1}">I</a>`:""}
+      ${d.f2?`<a target="_blank" href="${d.f2}">II</a>`:""}
+      ${d.f3?`<a target="_blank" href="${d.f3}">BR</a>`:""}
+    </td>
+    </tr>`;
+  });
+
+  document.getElementById("tablaDetalle").innerHTML = html;
 }
 
 // RESTO
@@ -365,42 +411,6 @@ function renderGrafico(data){
       scales: { x: { suggestedMax: 120 } }
     }
   });
-}
-
-function renderDetalle(filtrados){
-
-  let zona=document.getElementById("filtroZona").value;
-  let txt=limpiarTexto(document.getElementById("buscadorCalle").value);
-
-  let datos=filtrados.filter(d=>{
-    return (zona==="TODAS"||d.Zona===zona) &&
-           (!txt || limpiarTexto(d.calle).includes(txt));
-  });
-
-  let html=`<table><tr>
-  <th>Zona</th><th>Comuna</th><th>Calle</th>
-  <th>Inicio</th><th>Fin</th><th>Diámetro</th>
-  <th>Longitud</th><th>Aprobación</th><th>Fotos</th></tr>`;
-
-  datos.forEach(d=>{
-    html+=`<tr>
-    <td>${d.Zona}</td>
-    <td>${d.comuna||"-"}</td>
-    <td>${d.calle||"-"}</td>
-    <td>${d.inicio||"-"}</td>
-    <td>${d.fin||"-"}</td>
-    <td>${d.diametro||"-"}</td>
-    <td>${parseNumero(d.longitud).toFixed(0)}</td>
-    <td>${d.estado||"-"}</td>
-    <td>
-      ${d.f1?`<a target="_blank" href="${d.f1}">I</a>`:""}
-      ${d.f2?`<a target="_blank" href="${d.f2}">II</a>`:""}
-      ${d.f3?`<a target="_blank" href="${d.f3}">BR</a>`:""}
-    </td>
-    </tr>`;
-  });
-
-  document.getElementById("tablaDetalle").innerHTML = html;
 }
 
 document.addEventListener("input",calcular);
