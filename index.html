@@ -316,7 +316,7 @@ function renderMapa(filtrados){
   });
 }
 
-// TABLA DETALLE (MODIFICADA)
+// TABLA DETALLE
 function renderDetalle(filtrados){
 
   let zona=document.getElementById("filtroZona").value;
@@ -364,24 +364,45 @@ function renderDetalle(filtrados){
   document.getElementById("tablaDetalle").innerHTML = html;
 }
 
-// RESTO
+// TABLA RESUMEN CON I.I
 function renderTabla(data){
+
   let html=`<table><tr>
-  <th>Zona</th><th>Aprobado</th><th>%</th><th>Faltantes</th>
-  <th>Rechazado</th><th>Revisión</th></tr>`;
+  <th>Zona</th>
+  <th>Aprobado</th>
+  <th>%</th>
+  <th>Faltantes</th>
+  <th>Rechazado</th>
+  <th>Revisión</th>
+  <th>I.I</th>
+  </tr>`;
 
   Object.keys(data).forEach(z=>{
+
     let d=data[z];
-    let p=((d.longitud/pliego[z])*100||0).toFixed(1);
-    let falt=pliego[z]-d.longitud;
+
+    let aprobados = d.longitud;
+    let rechazados = d.rechazados;
+
+    let ii = 0;
+
+    let total = aprobados + rechazados;
+
+    if(total > 0){
+      ii = (rechazados / total) * 100;
+    }
+
+    let p=((aprobados/pliego[z])*100||0).toFixed(1);
+    let falt=pliego[z]-aprobados;
 
     html+=`<tr>
     <td>${z}</td>
-    <td>${d.longitud.toFixed(0)}</td>
+    <td>${aprobados.toFixed(0)}</td>
     <td>${p}%</td>
     <td>${falt.toFixed(0)}</td>
-    <td>${d.rechazados.toFixed(0)}</td>
+    <td>${rechazados.toFixed(0)}</td>
     <td>${d.revision.toFixed(0)}</td>
+    <td>${ii.toFixed(1)}%</td>
     </tr>`;
   });
 
